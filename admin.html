@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scribae Tabula – Admin</title>
+<link rel="icon" href="icon.svg"><script src="config.js"></script><script src="scribae.js"></script>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#2563eb;--sl:rgba(37,99,235,.15);color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--ln)}header a{color:var(--ac)}
+main{padding:16px;max-width:1150px;margin:auto}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--ln);vertical-align:middle}th{color:var(--mu);font-weight:500}
+button{font:inherit;color:inherit;background:none;border:1px solid var(--ln);border-radius:6px;padding:3px 8px;cursor:pointer;margin:1px}button:hover{background:var(--hd)}
+input{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--ln);border-radius:6px;padding:5px 8px}
+.mu{color:var(--mu)}
+</style></head>
+<body>
+<header><b>Scribae Tabula · Admin</b><a href="tabula.html">Sheets</a><a href="docs.html">Docs</a></header>
+<main id="m">Loading…</main>
+<script>
+'use strict';
+const $=s=>document.querySelector(s),m=$('#m'),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const A=(p,o)=>Scribae.api('/admin'+p,o);
+const L={reset:'Reset password',role:'Change role',tokens:'Set tokens',delete:'Delete'};
+function render(us,s){m.innerHTML='<h3>Users ('+us.length+')</h3><div style="overflow:auto"><table><tr><th>User<th>Role<th>Status<th>Tokens<th>Files<th>Storage<th>Last sign-in<th>Actions</tr>'
++us.map(u=>'<tr><td>'+esc(u.name)+'<td>'+u.role+'<td>'+(u.disabled?'disabled':'active')+'<td>'+u.tokens+'<td>'+u.files+'<td>'+(u.bytes/1048576).toFixed(2)+' MB<td>'+(u.last?new Date(u.last).toLocaleString():'never')+'<td>'
++['reset','disable','role','tokens','delete'].map(a=>'<button data-a="'+a+'" data-i="'+u.id+'" data-n="'+esc(u.name)+'">'+(a==='disable'?(u.disabled?'Enable':'Disable'):L[a])+'</button>').join('')).join('')+'</table></div>'
++'<h3>Settings</h3><p><label><input type="checkbox" id="op" '+(s.open?'checked':'')+'> Open registration</label></p>'
++'<p>Grant <input id="ga" type="number" min="0" value="'+s.grant.amount+'" style="width:80px"> tokens to every active user every <input id="gh" type="number" min="0" value="'+s.grant.everyHours+'" style="width:70px"> hours (0 = off) <button id="sv">Save settings</button> <button id="gn">Grant to all now</button></p>'
++'<p class="mu">Passwords are stored only as salted scrypt hashes and cannot be viewed by anyone. “Reset password” issues a temporary one, shown once.</p>'}
+async function boot(){await Scribae.ready;
+if(!Scribae.online){m.innerHTML='<p>No Scribae server is reachable. Check <code>api</code> in <code>config.js</code> and that <code>server.js</code> is running.</p>';return}
+if(!Scribae.me){m.innerHTML='<h3>Admin sign-in</h3><input id="u" placeholder="Username" autocomplete="username"> <input id="p" type="password" placeholder="Password" autocomplete="current-password"> <button id="go">Sign in</button> <span id="er" class="mu"></span>';$('#go').onclick=async()=>{try{await Scribae.login($('#u').value.trim(),$('#p').value);boot()}catch(e){$('#er').textContent=e.message}};return}
+if(Scribae.me.role!=='admin'){m.innerHTML='<p>This page is for admins only.</p>';return}
+try{const[u,s]=await Promise.all([A('/users'),A('/settings')]);render(u.users,s)}catch(e){m.textContent=e.message}}
+m.onclick=async e=>{const b=e.target,a=b.dataset.a,i=b.dataset.i;try{
+if(a==='reset'){if(!confirm('Reset the password for '+b.dataset.n+'?'))return;const r=await A('/users/'+i,{m:'POST',b:{action:'reset'}});alert('Temporary password for '+b.dataset.n+':\n\n'+r.temp+'\n\nShown once. They should change it after signing in.')}
+else if(a==='tokens'){const v=prompt('Set token balance for '+b.dataset.n);if(v===null)return;await A('/users/'+i,{m:'POST',b:{action:'tokens',value:v}})}
+else if(a==='delete'){if(!confirm('Permanently delete '+b.dataset.n+' and all of their files?'))return;await A('/users/'+i,{m:'POST',b:{action:'delete'}})}
+else if(a==='disable'||a==='role')await A('/users/'+i,{m:'POST',b:{action:a}});
+else if(b.id==='sv')await A('/settings',{m:'PUT',b:{open:$('#op').checked,grant:{amount:+$('#ga').value,everyHours:+$('#gh').value}}});
+else if(b.id==='gn'){if(!confirm('Add the grant amount to every active user now?'))return;await A('/grant',{m:'POST',b:{amount:+$('#ga').value}})}
+else return;boot()}catch(x){alert(x.message)}};
+boot();
+</script>
+</body></html>
