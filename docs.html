@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scribae Tabula – Docs</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#2563eb">
+<script src="config.js"></script><script src="scribae.js"></script>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#2563eb;--sl:rgba(37,99,235,.15);color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--hd);color:var(--fg);font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:4px 8px;background:var(--bg);border-bottom:1px solid var(--ln);flex:none}
+.br{font-weight:700;margin-right:4px;color:inherit;text-decoration:none}
+button,select{font:inherit;color:inherit;background:none;border:1px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;white-space:nowrap}
+button:hover,select:hover{background:var(--hd);border-color:var(--ln)}
+input[type=color]{width:30px;height:26px;padding:0;border:0;background:none;cursor:pointer}
+#dn{border:1px solid transparent;border-radius:6px;padding:4px 6px;font:inherit;font-weight:600;color:inherit;background:var(--bg);width:200px;margin-right:6px}
+#dn:hover,#dn:focus{border-color:var(--ln)}
+.sp{flex:1}#st,#wc{color:var(--mu);padding:0 6px}#sb{display:flex;align-items:center;gap:2px}
+#wrap{flex:1;overflow:auto;padding:24px 8px}
+#pg{box-sizing:border-box;background:var(--bg);max-width:816px;min-height:1056px;margin:0 auto;padding:72px 80px;box-shadow:0 1px 4px rgba(0,0,0,.25);outline:none;line-height:1.55;font-size:16px;overflow-wrap:anywhere}
+@media(max-width:700px){#pg{padding:24px 16px;min-height:80vh}}
+#pg table{border-collapse:collapse;width:100%}#pg td,#pg th{border:1px solid var(--ln);padding:4px 8px}
+#pg blockquote{margin:1em 0;padding-left:1em;border-left:3px solid var(--ln);color:var(--mu)}
+@media print{.bar{display:none}body{background:#fff;display:block}#wrap{padding:0;overflow:visible}#pg{box-shadow:none;padding:0;min-height:0}}
+</style></head>
+<body>
+<div class="bar"><b class="br">Scribae Tabula</b><a href="tabula.html" class="br" style="font-weight:400;margin-right:8px">Sheets</a>
+<input id="dn" value="Untitled document" aria-label="Document name" spellcheck="false">
+<button id="nw">New</button><button id="op">Open</button><input id="fi" type="file" hidden accept=".json,.html,.htm,.txt,.md,.doc,.docx">
+<button id="sv" title="Save as a Scribae doc (Ctrl+S)">Save</button>
+<select id="ex"><option value="">Export as…</option><option value="html">Web page (.html)</option><option value="doc">Word (.doc)</option><option value="txt">Text (.txt)</option><option value="pdf">PDF (print)</option></select>
+<span class="sp"></span><span id="st"></span><span id="sb"></span></div>
+<div class="bar" id="fm">
+<button data-c="undo" title="Undo">↶</button><button data-c="redo" title="Redo">↷</button>
+<select id="bl" title="Paragraph style"><option value="p">Paragraph</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Quote</option></select>
+<button data-c="bold" title="Bold"><b>B</b></button><button data-c="italic" title="Italic"><i>I</i></button><button data-c="underline" title="Underline"><u>U</u></button><button data-c="strikeThrough" title="Strikethrough"><s>S</s></button>
+<input type="color" id="fc" value="#000000" title="Text colour"><input type="color" id="hc" value="#ffe14d" title="Highlight colour">
+<button data-c="insertUnorderedList">Bullets</button><button data-c="insertOrderedList">Numbers</button>
+<button data-c="justifyLeft">Left</button><button data-c="justifyCenter">Centre</button><button data-c="justifyRight">Right</button>
+<button id="lk">Link</button><button id="tb">Table</button><button data-c="insertHorizontalRule">Rule</button><button data-c="removeFormat">Clear</button>
+<span class="sp"></span><span id="wc"></span></div>
+<div id="wrap"><div id="pg" contenteditable="true" spellcheck="true"></div></div>
+<script>
+'use strict';
+const $=i=>document.getElementById(i),pg=$('pg'),esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const fh=s=>{let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)}return(x>>>0).toString(16)};
+const say=m=>{$('st').textContent=m;clearTimeout(say.t);say.t=setTimeout(()=>$('st').textContent='',6000)};
+const nameOf=()=>$('dn').value.trim()||'Untitled document',safe=()=>nameOf().replace(/[\\\/:*?"<>|]/g,'_');
+let rg=null,dirty=0,pt;
+const docStr=()=>{const h=pg.innerHTML;return JSON.stringify({format:'scribae-doc',version:1,name:nameOf(),html:h,check:fh(h)})};
+const stat=()=>{const t=pg.innerText.trim();$('wc').textContent=(t?t.split(/\s+/).length:0)+' words'};
+const persist=()=>{dirty=1;clearTimeout(pt);pt=setTimeout(()=>{try{localStorage.setItem('scribae.doc.draft',docStr())}catch(e){}},700)};
+const setHtml=(h,n)=>{pg.innerHTML=Scribae.clean(h)||'<p><br></p>';$('dn').value=n||'Untitled document';stat();persist();dirty=0};
+function loadDoc(t,name){const o=JSON.parse(t);if(!o||o.format!=='scribae-doc'||typeof o.html!=='string')throw new Error('not a Scribae doc');setHtml(o.html,o.name||name);if(o.check!==undefined&&o.check!==fh(o.html))say('Opened – checksum mismatch: the file may have been edited or damaged')}
+const lib=u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('could not load the .docx converter (offline?)'));document.head.append(s)});
+async function openFile(f){try{const n=f.name,b=n.replace(/\.[^.]+$/,''),buf=await f.arrayBuffer(),u=new Uint8Array(buf,0,2);
+if(u[0]===208&&u[1]===207)throw new Error('old binary .doc files are not supported – save as .docx first');
+if(/\.docx$/i.test(n)||(u[0]===80&&u[1]===75)){await lib('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');setHtml((await mammoth.convertToHtml({arrayBuffer:buf})).value,b)}
+else{const t=new TextDecoder().decode(buf);if(/\.json$/i.test(n))loadDoc(t,b);else if(/\.(html?|doc)$/i.test(n)||/^\s*</.test(t))setHtml(t,b);else setHtml(t.split(/\r?\n/).map(l=>'<p>'+(esc(l)||'<br>')+'</p>').join(''),b)}
+say('Opened '+n)}catch(e){say('Could not open '+f.name+': '+e.message)}}
+const dl=(n,d,t)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([d],{type:t}));a.download=n;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4e3)};
+const save=()=>{dl(safe()+'.scribae-doc.json',docStr(),'application/json');dirty=0;say('Saved '+safe()+'.scribae-doc.json')};
+function exp(k){$('ex').value='';const h=pg.innerHTML,t=esc(nameOf());
+if(k==='html')dl(safe()+'.html','<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+t+'</title></head><body>'+h+'</body></html>','text/html');
+else if(k==='doc')dl(safe()+'.doc','<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>'+t+'</title></head><body>'+h+'</body></html>','application/msword');
+else if(k==='txt')dl(safe()+'.txt',pg.innerText,'text/plain');
+else if(k==='pdf')print()}
+document.addEventListener('selectionchange',()=>{const s=getSelection();if(s.rangeCount&&pg.contains(s.anchorNode))rg=s.getRangeAt(0).cloneRange()});
+const x=(c,v)=>{pg.focus();if(rg){const s=getSelection();s.removeAllRanges();s.addRange(rg)}document.execCommand('styleWithCSS',false,true);document.execCommand(c,false,v)};
+document.querySelectorAll('#fm button').forEach(b=>{b.onmousedown=e=>e.preventDefault();if(b.dataset.c)b.onclick=()=>x(b.dataset.c)});
+$('bl').onchange=e=>x('formatBlock',e.target.value);
+$('fc').onchange=e=>x('foreColor',e.target.value);$('hc').onchange=e=>x('hiliteColor',e.target.value);
+$('lk').onclick=()=>{const u=prompt('Link address (https://…)');if(u&&/^(https?:|mailto:)/i.test(u))x('createLink',u)};
+$('tb').onclick=()=>x('insertHTML','<table>'+('<tr>'+'<td>&nbsp;</td>'.repeat(3)+'</tr>').repeat(3)+'</table><p><br></p>');
+pg.addEventListener('input',()=>{stat();persist()});
+pg.addEventListener('paste',e=>{e.preventDefault();const d=e.clipboardData,h=d.getData('text/html');document.execCommand('insertHTML',false,h?Scribae.clean(h):esc(d.getData('text/plain')).replace(/\r?\n/g,'<br>'))});
+$('nw').onclick=()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;setHtml('<p><br></p>','Untitled document')};
+$('op').onclick=()=>$('fi').click();$('fi').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openFile(f)};
+$('sv').onclick=save;$('ex').onchange=e=>exp(e.target.value);$('dn').oninput=persist;
+addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save()}});
+addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)openFile(f)});
+addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+try{loadDoc(localStorage.getItem('scribae.doc.draft'))}catch(e){pg.innerHTML='<p><br></p>';stat()}
+dirty=0;
+Scribae.mount({kind:'doc',el:$('sb'),getName:nameOf,getContent:docStr,setContent:(s,n)=>loadDoc(s,n)});
+</script>
+</body></html>
