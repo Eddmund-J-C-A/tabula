@@ -1,0 +1,50 @@
+/* Scribae shared module: accounts, Drive, theme, offline (PWA) and the integration API (window.Scribae). */
+(()=>{'use strict';
+const cfg=window.SCRIBAE_CONFIG||{},API=(cfg.api||'').replace(/\/$/,''),LS=localStorage,R=document.documentElement;
+let tok=LS.getItem('scribae.tok')||'',me=null,srv=false,H=null;const ev={};
+const q=(s,r)=>(r||document).querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const on=(e,f)=>(ev[e]=ev[e]||[]).push(f),emit=(e,d)=>(ev[e]||[]).forEach(f=>{try{f(d)}catch(x){console.error(x)}});
+async function api(p,o={}){const r=await fetch(API+'/api'+p,{method:o.m||'GET',headers:{'Content-Type':'application/json',...(tok?{Authorization:'Bearer '+tok}:{})},body:o.b?JSON.stringify(o.b):undefined}),j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Request failed ('+r.status+')');return j}
+const setTok=t=>{tok=t;t?LS.setItem('scribae.tok',t):LS.removeItem('scribae.tok')};
+/* theme: accent colour + light/dark, remembered per browser and per account */
+const pushPrefs=()=>{if(me)api('/me',{m:'PUT',b:{prefs:{ac:LS.getItem('scribae.ac')||'',theme:LS.getItem('scribae.th')||'auto'}}}).catch(()=>{})};
+function accent(c,save){if(!/^#[0-9a-f]{6}$/i.test(c))return;const n=parseInt(c.slice(1),16);R.style.setProperty('--ac',c);R.style.setProperty('--sl','rgba('+(n>>16)+','+(n>>8&255)+','+(n&255)+',.15)');LS.setItem('scribae.ac',c);if(save)pushPrefs()}
+function mode(m,save){m==='light'||m==='dark'?R.setAttribute('data-theme',m):R.removeAttribute('data-theme');LS.setItem('scribae.th',m);if(save)pushPrefs()}
+accent(LS.getItem('scribae.ac')||'');mode(LS.getItem('scribae.th')||'auto');
+/* strips scripts, handlers and unsafe URLs from HTML before it enters a document */
+const clean=h=>{const d=new DOMParser().parseFromString(h,'text/html');d.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form,svg,math').forEach(n=>n.remove());d.querySelectorAll('*').forEach(n=>[...n.attributes].forEach(a=>{if(/^on/i.test(a.name)||(/^(href|src|xlink:href|action|formaction)$/i.test(a.name)&&/^\s*(javascript|vbscript|data):/i.test(a.value)&&!/^\s*data:image\//i.test(a.value)))n.removeAttribute(a.name)}));return d.body.innerHTML};
+/* Drive: your server account when signed in, otherwise this browser */
+const LD={get:()=>{try{return JSON.parse(LS.getItem('scribae.drive')||'{}')}catch(e){return{}}},set:o=>LS.setItem('scribae.drive',JSON.stringify(o))};
+const cloud=()=>srv&&me;
+const drive={
+async list(kind){if(cloud())return(await api('/files')).files.filter(f=>!kind||f.kind===kind);return Object.values(LD.get()).filter(f=>!kind||f.kind===kind).map(f=>({id:f.id,name:f.name,kind:f.kind,updated:f.updated,size:f.content.length})).sort((a,b)=>b.updated-a.updated)},
+async get(id){if(cloud())return api('/files/'+id);const f=LD.get()[id];if(!f)throw new Error('No such file');return f},
+async save(f){if(cloud())return api('/files',{m:'POST',b:f});const d=LD.get(),id=f.id||Math.random().toString(16).slice(2,12).padEnd(10,'0');d[id]={id,name:f.name,kind:f.kind,content:f.content,updated:Date.now()};LD.set(d);return d[id]},
+async del(id){if(cloud())return api('/files/'+id,{m:'DELETE'});const d=LD.get();delete d[id];LD.set(d)}};
+/* UI */
+const st=document.createElement('style');st.textContent='#sdlg{border:1px solid var(--ln);border-radius:10px;background:var(--bg);color:var(--fg);padding:16px;min-width:300px;max-width:92vw;max-height:80vh;overflow:auto}#sdlg::backdrop{background:rgba(0,0,0,.4)}#sdlg input{display:block;margin:6px 0;padding:6px 8px;border:1px solid var(--ln);border-radius:6px;width:100%;box-sizing:border-box;background:var(--bg);color:inherit}#sdlg h3{margin:0 0 8px}#sdlg .row{display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--ln)}#sdlg .row span{flex:1;overflow-wrap:anywhere}#sdlg .pr{background:var(--ac);color:#fff}#sdlg .mu{color:var(--mu)}#sdlg button{font:inherit;color:inherit;background:none;border:1px solid var(--ln);border-radius:6px;padding:4px 8px;cursor:pointer}#sdlg .pr{color:#fff;background:var(--ac)}';document.head.append(st);
+function dlg(h){let d=q('#sdlg');if(!d){d=document.createElement('dialog');d.id='sdlg';document.body.append(d)}d.innerHTML=h+'<p><button data-x>Close</button></p>';q('[data-x]',d).onclick=()=>d.close();if(!d.open)d.showModal();return d}
+const msg=(d,t)=>{let m=q('.msg',d);if(!m){m=document.createElement('p');m.className='msg mu';d.append(m)}m.textContent=t};
+const label=()=>{const b=q('[data-a=acct]');if(b)b.textContent=srv?(me?me.name:'Sign in'):'Local mode';const c=q('[data-a=ac]'),t=q('[data-a=th]');if(c&&LS.getItem('scribae.ac'))c.value=LS.getItem('scribae.ac');if(t)t.value=LS.getItem('scribae.th')||'auto'};
+async function auth(kind,u,p){const r=await api('/'+kind,{m:'POST',b:{user:u,pass:p}});setTok(r.token);me=r.me;const pr=me.prefs||{};if(pr.ac)accent(pr.ac);if(pr.theme)mode(pr.theme);label();emit('auth',me);return me}
+const logout=()=>{setTok('');me=null;label();emit('auth',null)};
+function acct(){
+if(!srv)return dlg('<h3>Local mode</h3><p class="mu">No Scribae server is configured, so files stay in this browser. To enable accounts, a per-user Drive and the admin console, run <code>server.js</code> and set <code>api</code> in <code>config.js</code>.</p>');
+if(!me){const d=dlg('<h3>Scribae account</h3><input id="su" placeholder="Username" autocomplete="username"><input id="sp" type="password" placeholder="Password (8+ characters)" autocomplete="current-password"><p><button class="pr" data-a="login">Sign in</button> <button data-a="register">Create account</button></p>');
+d.onclick=async e=>{const a=e.target.dataset.a;if(!a)return;try{await auth(a,q('#su',d).value.trim(),q('#sp',d).value);d.close()}catch(x){msg(d,x.message)}};return}
+api('/me').then(m=>{me=m;label()}).catch(()=>{});
+const d=dlg('<h3>'+esc(me.name)+'</h3><p class="mu">'+esc(me.role)+' · '+me.tokens+' tokens</p><input id="so" type="password" placeholder="Current password" autocomplete="current-password"><input id="sn" type="password" placeholder="New password" autocomplete="new-password"><p><button data-a="pw">Change password</button> '+(me.role==='admin'?'<a href="admin.html">Admin console</a> ':'')+'<button data-a="out">Sign out</button></p>');
+d.onclick=async e=>{const a=e.target.dataset.a;try{if(a==='out'){logout();d.close()}else if(a==='pw'){const r=await api('/password',{m:'POST',b:{old:q('#so',d).value,pass:q('#sn',d).value}});setTok(r.token);msg(d,'Password changed')}}catch(x){msg(d,x.message)}}}
+async function drv(){if(!H)return;const d=dlg('<h3>Drive'+(cloud()?'':' (this browser)')+'</h3><p><button class="pr" data-a="save">Save “'+esc(H.getName())+'” to Drive</button></p><div id="sl" class="mu">Loading…</div>');
+const paint=async()=>{try{const L=await drive.list(H.kind);q('#sl',d).innerHTML=L.length?L.map(f=>'<div class="row"><span>'+esc(f.name)+' <small class="mu">'+new Date(f.updated).toLocaleString()+'</small></span><button data-a="open" data-i="'+esc(f.id)+'">Open</button><button data-a="del" data-i="'+esc(f.id)+'">Delete</button></div>').join(''):'Nothing saved yet.'}catch(x){msg(d,x.message)}};
+d.onclick=async e=>{const a=e.target.dataset.a,i=e.target.dataset.i;if(!a)return;try{if(a==='save'){const r=await drive.save({id:H.id,name:H.getName(),kind:H.kind,content:H.getContent()});H.id=r.id;await paint();msg(d,'Saved to Drive')}else if(a==='open'){const f=await drive.get(i);await H.setContent(f.content,f.name);H.id=f.id;d.close()}else if(a==='del'&&confirm('Delete this file from Drive?')){await drive.del(i);if(H.id===i)H.id=null;await paint()}}catch(x){msg(d,x.message)}};paint()}
+function mount(h){H=h;h.id=null;h.el.innerHTML='<button data-a="drive">Drive</button><button data-a="acct">Account</button><input type="color" data-a="ac" value="#2563eb" title="Accent colour" style="width:30px;height:26px;padding:0;border:0;background:none;cursor:pointer"><select data-a="th" title="Theme"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select>';
+const c=q('[data-a=ac]',h.el),t=q('[data-a=th]',h.el);h.el.onclick=e=>{const a=e.target.dataset.a;if(a==='drive')drv();else if(a==='acct')acct()};
+c.oninput=()=>accent(c.value,0);c.onchange=()=>accent(c.value,1);t.onchange=()=>mode(t.value,1);label()}
+/* start-up: detect the server, restore the session */
+const ready=(async()=>{try{await api('/ping');srv=true;if(tok){try{me=await api('/me');const pr=me.prefs||{};if(pr.ac)accent(pr.ac);if(pr.theme)mode(pr.theme)}catch(e){setTok('')}}}catch(e){srv=false}label();emit('ready',{server:srv,me});return srv})();
+/* embedding: a host page (listed in config.js embedOrigins) can send {scribae:'open',content,name} or {scribae:'get'} */
+addEventListener('message',async e=>{const m=e.data;if(!H||!m||!m.scribae||!(cfg.embedOrigins||[]).includes(e.origin))return;if(m.scribae==='open'){await H.setContent(m.content,m.name||'Untitled');H.id=null}else if(m.scribae==='get')e.source.postMessage({scribae:'doc',kind:H.kind,name:H.getName(),content:H.getContent()},e.origin)});
+if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+window.Scribae={cfg,api,drive,on,emit,mount,accent,mode,clean,ready,login:(u,p)=>auth('login',u,p),logout,get me(){return me},get online(){return srv}};
+})();
