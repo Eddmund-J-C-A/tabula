@@ -6,12 +6,12 @@
 <title>Scribae Tabula – Sheets</title>
 <script src="xlsx.full.min.js"></script>
 <script>window.XLSX||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>')</script>
-<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#28564b">
 <script src="config.js"></script><script src="scribae.js"></script>
 <style>
-:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#2563eb;--sl:rgba(37,99,235,.12);color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}}
-:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}
+:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#28564b;--sl:rgba(40,86,75,.14);color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7cc0ad;--sl:rgba(124,192,173,.18);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7cc0ad;--sl:rgba(124,192,173,.18);color-scheme:dark}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--fg);font:13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
@@ -46,7 +46,7 @@ td.a{outline:2px solid var(--ac);outline-offset:-2px;background:var(--bg)}
 <body>
 <div id="app">
 <div id="tb">
-<b class="br">Scribae Tabula</b><a href="docs.html" class="br" style="font-weight:400;margin-right:8px">Docs</a><input id="dn" value="Untitled spreadsheet" aria-label="Spreadsheet name" spellcheck="false">
+<a href="index.html" class="br" title="Back to all apps">Scribae Tabula</a><a href="docs.html" class="br" style="font-weight:400;margin-right:8px">Docs</a><input id="dn" value="Untitled spreadsheet" aria-label="Spreadsheet name" spellcheck="false">
 <button id="nw">New</button><button id="op">Open</button>
 <input id="fi" type="file" hidden accept=".csv,.tsv,.txt,.xlsx,.xlsm,.xlsb,.xls,.ods,.fods,.html,.htm,.tabula,.json">
 <button id="sv" title="Save as a Tabula file (Ctrl+S)">Save</button>
