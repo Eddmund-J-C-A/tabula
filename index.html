@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#142b28">
   <title>The Scriptorium | Home</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg">
+  <script src="config.js"></script>
+  <script src="scribae.js"></script>
   <style>
     :root {
       --forest: #193a34;
@@ -194,12 +198,19 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { transition: none !important; }
     }
+    :root { --bg: var(--paper); --fg: var(--ink); --ln: rgba(25,58,52,.16); --mu: var(--muted); --ac: var(--forest); --sl: rgba(25,58,52,.1); --hd: var(--cream); }
+    .hdr-r { display: flex; align-items: center; gap: 14px; }
+    .hdr-r a, #sb button {
+      font: 600 .78rem Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #89672f;
+      background: none; border: 1px solid rgba(196,154,85,.55); border-radius: 20px; padding: 6px 13px; text-decoration: none; cursor: pointer;
+    }
+    .hdr-r a:hover, #sb button:hover { background: rgba(196,154,85,.12); }
   </style>
 </head>
 <body>
   <header>
     <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span> THE SCRIPTORIUM</div>
-    <div class="top-note">A place for thought and discovery</div>
+    <div class="hdr-r"><div class="top-note">A place for thought and discovery</div><a id="admin-link" href="admin.html" hidden>Admin</a><span id="sb"></span></div>
   </header>
 
   <main>
@@ -235,5 +246,12 @@
   </main>
 
   <footer>Make good use of the hours given you.</footer>
+<script>
+  const adminLink = document.getElementById('admin-link');
+  const showAdmin = () => { adminLink.hidden = !(Scribae.me && Scribae.me.role === 'admin'); };
+  Scribae.mount({ el: document.getElementById('sb'), min: true });
+  Scribae.ready.then(showAdmin);
+  Scribae.on('auth', showAdmin);
+</script>
 </body>
 </html>
