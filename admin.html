@@ -3,9 +3,9 @@
 <title>Scribae Tabula – Admin</title>
 <link rel="icon" href="icon.svg"><script src="config.js"></script><script src="scribae.js"></script>
 <style>
-:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#2563eb;--sl:rgba(37,99,235,.15);color-scheme:light}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}}
-:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}
+:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#28564b;--sl:rgba(40,86,75,.15);color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7cc0ad;--sl:rgba(124,192,173,.18);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7cc0ad;--sl:rgba(124,192,173,.18);color-scheme:dark}
 body{margin:0;background:var(--bg);color:var(--fg);font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 header{display:flex;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--ln)}header a{color:var(--ac)}
 main{padding:16px;max-width:1150px;margin:auto}
@@ -15,18 +15,20 @@ input{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--ln)
 .mu{color:var(--mu)}
 </style></head>
 <body>
-<header><b>Scribae Tabula · Admin</b><a href="tabula.html">Sheets</a><a href="docs.html">Docs</a></header>
+<header><b>Scribae Tabula · Admin</b><a href="index.html">Home</a><a href="tabula.html">Sheets</a><a href="docs.html">Docs</a></header>
 <main id="m">Loading…</main>
 <script>
 'use strict';
 const $=s=>document.querySelector(s),m=$('#m'),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const A=(p,o)=>Scribae.api('/admin'+p,o);
-const L={reset:'Reset password',role:'Change role',tokens:'Set tokens',delete:'Delete'};
-function render(us,s){m.innerHTML='<h3>Users ('+us.length+')</h3><div style="overflow:auto"><table><tr><th>User<th>Role<th>Status<th>Tokens<th>Files<th>Storage<th>Last sign-in<th>Actions</tr>'
-+us.map(u=>'<tr><td>'+esc(u.name)+'<td>'+u.role+'<td>'+(u.disabled?'disabled':'active')+'<td>'+u.tokens+'<td>'+u.files+'<td>'+(u.bytes/1048576).toFixed(2)+' MB<td>'+(u.last?new Date(u.last).toLocaleString():'never')+'<td>'
-+['reset','disable','role','tokens','delete'].map(a=>'<button data-a="'+a+'" data-i="'+u.id+'" data-n="'+esc(u.name)+'">'+(a==='disable'?(u.disabled?'Enable':'Disable'):L[a])+'</button>').join('')).join('')+'</table></div>'
+const L={reset:'Reset password',role:'Change role',tokens:'Set credits',revokekeys:'Revoke keys',delete:'Delete'};
+function render(us,s){m.innerHTML='<h3>Users ('+us.length+')</h3><div style="overflow:auto"><table><tr><th>User<th>Role<th>Status<th>Credits<th>Keys<th>Files<th>Storage<th>Last sign-in<th>Actions</tr>'
++us.map(u=>'<tr><td>'+esc(u.name)+'<td>'+u.role+'<td>'+(u.disabled?'disabled':'active')+'<td>'+u.tokens+'<td>'+u.keys+'<td>'+u.files+'<td>'+(u.bytes/1048576).toFixed(2)+' MB<td>'+(u.last?new Date(u.last).toLocaleString():'never')+'<td>'
++['reset','disable','role','tokens','revokekeys','delete'].map(a=>'<button data-a="'+a+'" data-i="'+u.id+'" data-n="'+esc(u.name)+'">'+(a==='disable'?(u.disabled?'Enable':'Disable'):L[a])+'</button>').join('')).join('')+'</table></div>'
 +'<h3>Settings</h3><p><label><input type="checkbox" id="op" '+(s.open?'checked':'')+'> Open registration</label></p>'
-+'<p>Grant <input id="ga" type="number" min="0" value="'+s.grant.amount+'" style="width:80px"> tokens to every active user every <input id="gh" type="number" min="0" value="'+s.grant.everyHours+'" style="width:70px"> hours (0 = off) <button id="sv">Save settings</button> <button id="gn">Grant to all now</button></p>'
++'<p>Credits: grant <input id="ga" type="number" min="0" value="'+s.grant.amount+'" style="width:80px"> to every active user every <input id="gh" type="number" min="0" value="'+s.grant.everyHours+'" style="width:70px"> hours (0 = off) <button id="gn">Grant to all now</button></p>'
++'<p>API keys: deliver every active user a fresh key every <input id="kd" type="number" min="0" value="'+s.keyPush.everyDays+'" style="width:70px"> days (0 = off), each valid for <input id="kl" type="number" min="1" value="'+s.keyPush.lifeDays+'" style="width:70px"> days <button id="pk">Deliver keys now</button></p><p><button id="sv">Save settings</button></p>'
++'<h3>Add a user</h3><p><input id="nn" placeholder="Username"> <input id="np" placeholder="Temporary password (8+ characters)"> <select id="nr"><option value="user">User</option><option value="admin">Admin</option></select> <button id="au">Add user</button></p>'
 +'<p class="mu">Passwords are stored only as salted scrypt hashes and cannot be viewed by anyone. “Reset password” issues a temporary one, shown once.</p>'}
 async function boot(){await Scribae.ready;
 if(!Scribae.online){m.innerHTML='<p>No Scribae server is reachable. Check <code>api</code> in <code>config.js</code> and that <code>server.js</code> is running.</p>';return}
@@ -35,11 +37,14 @@ if(Scribae.me.role!=='admin'){m.innerHTML='<p>This page is for admins only.</p>'
 try{const[u,s]=await Promise.all([A('/users'),A('/settings')]);render(u.users,s)}catch(e){m.textContent=e.message}}
 m.onclick=async e=>{const b=e.target,a=b.dataset.a,i=b.dataset.i;try{
 if(a==='reset'){if(!confirm('Reset the password for '+b.dataset.n+'?'))return;const r=await A('/users/'+i,{m:'POST',b:{action:'reset'}});alert('Temporary password for '+b.dataset.n+':\n\n'+r.temp+'\n\nShown once. They should change it after signing in.')}
-else if(a==='tokens'){const v=prompt('Set token balance for '+b.dataset.n);if(v===null)return;await A('/users/'+i,{m:'POST',b:{action:'tokens',value:v}})}
+else if(a==='tokens'){const v=prompt('Set credit balance for '+b.dataset.n);if(v===null)return;await A('/users/'+i,{m:'POST',b:{action:'tokens',value:v}})}
 else if(a==='delete'){if(!confirm('Permanently delete '+b.dataset.n+' and all of their files?'))return;await A('/users/'+i,{m:'POST',b:{action:'delete'}})}
 else if(a==='disable'||a==='role')await A('/users/'+i,{m:'POST',b:{action:a}});
-else if(b.id==='sv')await A('/settings',{m:'PUT',b:{open:$('#op').checked,grant:{amount:+$('#ga').value,everyHours:+$('#gh').value}}});
+else if(b.id==='sv')await A('/settings',{m:'PUT',b:{open:$('#op').checked,grant:{amount:+$('#ga').value,everyHours:+$('#gh').value},keyPush:{everyDays:+$('#kd').value,lifeDays:+$('#kl').value}}});
 else if(b.id==='gn'){if(!confirm('Add the grant amount to every active user now?'))return;await A('/grant',{m:'POST',b:{amount:+$('#ga').value}})}
+else if(a==='revokekeys'){if(!confirm('Revoke every API key (and undelivered key) for '+b.dataset.n+'?'))return;await A('/users/'+i,{m:'POST',b:{action:'revokekeys'}})}
+else if(b.id==='pk'){if(!confirm('Deliver a fresh key to every active user now?'))return;await A('/push-keys',{m:'POST',b:{}})}
+else if(b.id==='au'){await A('/users',{m:'POST',b:{name:$('#nn').value.trim(),pass:$('#np').value,role:$('#nr').value}})}
 else return;boot()}catch(x){alert(x.message)}};
 boot();
 </script>
