@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Scribae Tabula – Docs</title>
-<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#28564b">
 <script src="config.js"></script><script src="scribae.js"></script>
 <style>
-:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#2563eb;--sl:rgba(37,99,235,.15);color-scheme:light}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}}
-:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7aa7ff;--sl:rgba(122,167,255,.18);color-scheme:dark}
+:root{--bg:#fff;--fg:#1f2328;--mu:#6b7280;--ln:#dfe2e6;--hd:#f4f5f7;--ac:#28564b;--sl:rgba(40,86,75,.15);color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7cc0ad;--sl:rgba(124,192,173,.18);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#17191c;--fg:#e6e8eb;--mu:#9aa1ab;--ln:#32363c;--hd:#212429;--ac:#7cc0ad;--sl:rgba(124,192,173,.18);color-scheme:dark}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;background:var(--hd);color:var(--fg);font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .bar{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:4px 8px;background:var(--bg);border-bottom:1px solid var(--ln);flex:none}
@@ -25,7 +25,7 @@ input[type=color]{width:30px;height:26px;padding:0;border:0;background:none;curs
 @media print{.bar{display:none}body{background:#fff;display:block}#wrap{padding:0;overflow:visible}#pg{box-shadow:none;padding:0;min-height:0}}
 </style></head>
 <body>
-<div class="bar"><b class="br">Scribae Tabula</b><a href="tabula.html" class="br" style="font-weight:400;margin-right:8px">Sheets</a>
+<div class="bar"><a href="index.html" class="br" title="Back to all apps">Scribae Tabula</a><a href="tabula.html" class="br" style="font-weight:400;margin-right:8px">Sheets</a>
 <input id="dn" value="Untitled document" aria-label="Document name" spellcheck="false">
 <button id="nw">New</button><button id="op">Open</button><input id="fi" type="file" hidden accept=".json,.html,.htm,.txt,.md,.doc,.docx">
 <button id="sv" title="Save as a Scribae doc (Ctrl+S)">Save</button>
