@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#142b28">
+  <title>The Scriptorium | Home</title>
+  <style>
+    :root {
+      --forest: #193a34;
+      --forest-light: #28564b;
+      --cream: #f5f0e5;
+      --paper: #fffdf7;
+      --gold: #c49a55;
+      --ink: #23342f;
+      --muted: #66736b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 15% 15%, rgba(196,154,85,.13), transparent 30%),
+        radial-gradient(ellipse at 90% 80%, rgba(40,86,75,.12), transparent 32%),
+        var(--cream);
+      font-family: Georgia, "Times New Roman", serif;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 22px 7vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(25,58,52,.14);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--forest);
+      font-size: 1.08rem;
+      letter-spacing: .04em;
+      font-weight: bold;
+    }
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--gold);
+      border-radius: 50%;
+      color: var(--gold);
+      font-size: 21px;
+    }
+    .top-note {
+      color: var(--muted);
+      font-size: .9rem;
+      font-style: italic;
+    }
+    main {
+      width: min(1050px, 88vw);
+      margin: auto;
+      padding: 70px 0 76px;
+      text-align: center;
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: .22em;
+      color: #8b6a36;
+      font: 600 .76rem/1.5 Arial, sans-serif;
+    }
+    h1 {
+      margin: 16px 0 14px;
+      color: var(--forest);
+      font-size: clamp(2.6rem, 6vw, 4.8rem);
+      font-weight: normal;
+      line-height: 1.04;
+    }
+    .intro {
+      max-width: 570px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: 1.12rem;
+      line-height: 1.75;
+    }
+    .ornament {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: min(280px, 65%);
+      margin: 32px auto 38px;
+      color: var(--gold);
+    }
+    .ornament::before, .ornament::after {
+      content: "";
+      height: 1px;
+      flex: 1;
+      background: currentColor;
+      opacity: .7;
+    }
+    .ornament span { font-size: 1.15rem; }
+    .choices {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      max-width: 760px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    .choice {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 235px;
+      padding: 30px;
+      color: var(--ink);
+      text-decoration: none;
+      background: rgba(255,253,247,.88);
+      border: 1px solid rgba(25,58,52,.16);
+      border-radius: 7px;
+      box-shadow: 0 10px 30px rgba(31,49,40,.055);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .choice::after {
+      content: "";
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      right: -55px;
+      bottom: -70px;
+      border: 1px solid rgba(196,154,85,.32);
+      border-radius: 50%;
+      box-shadow: 0 0 0 13px rgba(196,154,85,.045), 0 0 0 27px rgba(196,154,85,.035);
+      pointer-events: none;
+    }
+    .choice:hover, .choice:focus-visible {
+      transform: translateY(-4px);
+      border-color: var(--gold);
+      box-shadow: 0 16px 35px rgba(31,49,40,.11);
+      outline: none;
+    }
+    .choice-icon {
+      display: grid;
+      place-items: center;
+      width: 47px;
+      height: 47px;
+      margin-bottom: 23px;
+      color: var(--gold);
+      border: 1px solid rgba(196,154,85,.6);
+      border-radius: 50%;
+    }
+    .choice-icon svg { width: 23px; height: 23px; }
+    .choice h2 {
+      margin: 0 0 9px;
+      color: var(--forest);
+      font-size: 1.65rem;
+      font-weight: normal;
+    }
+    .choice p {
+      margin: 0;
+      max-width: 270px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: .98rem;
+    }
+    .open-link {
+      margin-top: auto;
+      padding-top: 24px;
+      color: #89672f;
+      font: 600 .78rem Arial, sans-serif;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .open-link span { padding-left: 6px; transition: padding .2s ease; }
+    .choice:hover .open-link span { padding-left: 12px; }
+    footer {
+      padding: 20px;
+      text-align: center;
+      color: #7b847d;
+      border-top: 1px solid rgba(25,58,52,.12);
+      font-size: .84rem;
+      letter-spacing: .03em;
+    }
+    @media (max-width: 620px) {
+      header { padding: 18px 6vw; }
+      .top-note { display: none; }
+      main { padding: 55px 0; }
+      .choices { grid-template-columns: 1fr; gap: 15px; }
+      .choice { min-height: 215px; padding: 25px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span> THE SCRIPTORIUM</div>
+    <div class="top-note">A place for thought and discovery</div>
+  </header>
+
+  <main>
+    <div class="eyebrow">Welcome to your workspace</div>
+    <h1>Choose your next page.</h1>
+    <p class="intro">Gather your thoughts, shape your words, and set your ideas in order. Where shall we begin?</p>
+    <div class="ornament" aria-hidden="true"><span>✧</span></div>
+
+    <nav class="choices" aria-label="Choose a workspace">
+      <a class="choice" href="docs.html">
+        <div class="choice-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3.75h8l4 4v12.5H6z"/><path d="M14 3.75v4h4M9 12h6M9 15.5h6"/>
+          </svg>
+        </div>
+        <h2>Docs</h2>
+        <p>Write, revise, and give your ideas a lasting form.</p>
+        <div class="open-link">Enter documents <span aria-hidden="true">→</span></div>
+      </a>
+
+      <a class="choice" href="tabula.html">
+        <div class="choice-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.75" y="4.25" width="16.5" height="15.5" rx="1"/>
+            <path d="M3.75 9.5h16.5M9.25 4.25v15.5M14.75 4.25v15.5M3.75 14.5h16.5"/>
+          </svg>
+        </div>
+        <h2>Sheets</h2>
+        <p>Arrange your figures, track your work, and see the pattern.</p>
+        <div class="open-link">Enter spreadsheets <span aria-hidden="true">→</span></div>
+      </a>
+    </nav>
+  </main>
+
+  <footer>Make good use of the hours given you.</footer>
+</body>
+</html>
