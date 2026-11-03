@@ -5,11 +5,11 @@ compatibility_date = "2025-06-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "scribae"
-database_id = "PASTE-THE-ID-FROM-wrangler-d1-create"
+database_id = "14a5858a-7075-4321-8e4a-c0dddf72dd81"
 
 [vars]
 # Your site's origin(s), comma-separated. Scheme and host only: no path, no trailing slash.
-ALLOWED_ORIGINS = "https://YOURNAME.github.io"
+ALLOWED_ORIGINS = "https://eddmund-j-c-a.github.io"
 
 [triggers]
 # Hourly check for scheduled credit grants and key delivery.
