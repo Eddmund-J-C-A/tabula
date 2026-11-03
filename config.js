@@ -1,4 +1,5 @@
-// Scribae Tabula settings. Leave api empty for local mode (e.g. GitHub Pages with no server).
-// With the Node server running elsewhere: api: 'https://your-server.example.com'
-// embedOrigins: sites allowed to embed this app and talk to it via postMessage.
+// Scribae Tabula settings.
+// api: the address of your Cloudflare Worker, e.g. 'https://scribae-api.YOURNAME.workers.dev'.
+//      Leave '' to run in local mode (no accounts; files stay in this browser).
+// embedOrigins: other sites allowed to embed these pages and talk to them via postMessage.
 window.SCRIBAE_CONFIG={api:'',embedOrigins:[]};
