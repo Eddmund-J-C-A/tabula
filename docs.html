@@ -21,6 +21,13 @@ input[type=color]{width:30px;height:26px;padding:0;border:0;background:none;curs
 #pg{box-sizing:border-box;background:var(--bg);max-width:816px;min-height:1056px;margin:0 auto;padding:72px 80px;box-shadow:0 1px 4px rgba(0,0,0,.25);outline:none;line-height:1.55;font-size:16px;overflow-wrap:anywhere}
 @media(max-width:700px){#pg{padding:24px 16px;min-height:80vh}}
 #pg table{border-collapse:collapse;width:100%}#pg td,#pg th{border:1px solid var(--ln);padding:4px 8px}
+#pg table[data-b=none] td,#pg table[data-b=none] th{outline:1px dashed rgba(128,128,128,.3);outline-offset:-1px}
+#pg td.tsel,#pg th.tsel{background-image:linear-gradient(var(--sl),var(--sl))}
+#pg.dsel{-webkit-user-select:none;user-select:none}
+#tt{display:none;background:var(--sl)}#tt.on{display:flex}#tt .lb{color:var(--mu);padding:0 6px;font-size:12px}
+#tp{position:fixed;z-index:20;display:none;background:var(--bg);border:1px solid var(--ln);border-radius:8px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,.25)}#tp.on{display:block}
+#tg{display:grid;grid-template-columns:repeat(8,20px);gap:2px}#tg i{width:20px;height:20px;border:1px solid var(--ln);box-sizing:border-box;cursor:pointer}#tg i.h{background:var(--ac);border-color:var(--ac)}
+#tp .f{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;color:var(--mu);font-size:12px}
 #pg blockquote{margin:1em 0;padding-left:1em;border-left:3px solid var(--ln);color:var(--mu)}
 @media print{.bar{display:none}body{background:#fff;display:block}#wrap{padding:0;overflow:visible}#pg{box-shadow:none;padding:0;min-height:0}}
 </style></head>
@@ -40,7 +47,16 @@ input[type=color]{width:30px;height:26px;padding:0;border:0;background:none;curs
 <button data-c="justifyLeft">Left</button><button data-c="justifyCenter">Centre</button><button data-c="justifyRight">Right</button>
 <button id="lk">Link</button><button id="tb">Table</button><button data-c="insertHorizontalRule">Rule</button><button data-c="removeFormat">Clear</button>
 <span class="sp"></span><span id="wc"></span></div>
+<div class="bar" id="tt"><span class="lb">Table</span>
+<button data-t="rowa" title="Insert a row above">Row ↑</button><button data-t="rowb" title="Insert a row below">Row ↓</button><button data-t="rowd" title="Delete the selected row(s)">Delete row</button>
+<button data-t="cola" title="Insert a column on the left">Col ←</button><button data-t="colb" title="Insert a column on the right">Col →</button><button data-t="cold" title="Delete the selected column(s)">Delete col</button>
+<button data-t="merge" title="Drag across cells to select, then merge. On a merged cell this splits it.">Merge</button>
+<button data-t="head" title="Turn the top row into a header row, or back">Header row</button>
+<input type="color" id="tf" value="#ffe14d" title="Fill the selected cells"><button data-t="nofill" title="Remove the fill">No fill</button>
+<select id="tbd" title="Borders"><option value="all">All borders</option><option value="light">Light borders</option><option value="none">No borders</option></select>
+<button data-t="del" title="Delete the whole table">Delete table</button></div>
 <div id="wrap"><div id="pg" contenteditable="true" spellcheck="true"></div></div>
+<div id="tp"><div id="tg"></div><div class="f"><span id="tl">1 × 1</span><label><input type="checkbox" id="th" checked> Header row</label></div></div>
 <script>
 'use strict';
 const $=i=>document.getElementById(i),pg=$('pg'),esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -48,7 +64,8 @@ const fh=s=>{let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=M
 const say=m=>{$('st').textContent=m;clearTimeout(say.t);say.t=setTimeout(()=>$('st').textContent='',6000)};
 const nameOf=()=>$('dn').value.trim()||'Untitled document',safe=()=>nameOf().replace(/[\\\/:*?"<>|]/g,'_');
 let rg=null,dirty=0,pt;
-const docStr=()=>{const h=pg.innerHTML;return JSON.stringify({format:'scribae-doc',version:1,name:nameOf(),html:h,check:fh(h)})};
+const H=()=>pg.innerHTML.replace(/ class="(tsel)?"/g,'');
+const docStr=()=>{const h=H();return JSON.stringify({format:'scribae-doc',version:1,name:nameOf(),html:h,check:fh(h)})};
 const stat=()=>{const t=pg.innerText.trim();$('wc').textContent=(t?t.split(/\s+/).length:0)+' words'};
 const persist=()=>{dirty=1;clearTimeout(pt);pt=setTimeout(()=>{try{localStorage.setItem('scribae.doc.draft',docStr())}catch(e){}},700)};
 const setHtml=(h,n)=>{pg.innerHTML=Scribae.clean(h)||'<p><br></p>';$('dn').value=n||'Untitled document';stat();persist();dirty=0};
@@ -61,7 +78,7 @@ else{const t=new TextDecoder().decode(buf);if(/\.json$/i.test(n))loadDoc(t,b);el
 say('Opened '+n)}catch(e){say('Could not open '+f.name+': '+e.message)}}
 const dl=(n,d,t)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([d],{type:t}));a.download=n;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4e3)};
 const save=()=>{dl(safe()+'.scribae-doc.json',docStr(),'application/json');dirty=0;say('Saved '+safe()+'.scribae-doc.json')};
-function exp(k){$('ex').value='';const h=pg.innerHTML,t=esc(nameOf());
+function exp(k){$('ex').value='';const h=H(),t=esc(nameOf());
 if(k==='html')dl(safe()+'.html','<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+t+'</title></head><body>'+h+'</body></html>','text/html');
 else if(k==='doc')dl(safe()+'.doc','<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>'+t+'</title></head><body>'+h+'</body></html>','application/msword');
 else if(k==='txt')dl(safe()+'.txt',pg.innerText,'text/plain');
@@ -72,7 +89,86 @@ document.querySelectorAll('#fm button').forEach(b=>{b.onmousedown=e=>e.preventDe
 $('bl').onchange=e=>x('formatBlock',e.target.value);
 $('fc').onchange=e=>x('foreColor',e.target.value);$('hc').onchange=e=>x('hiliteColor',e.target.value);
 $('lk').onclick=()=>{const u=prompt('Link address (https://…)');if(u&&/^(https?:|mailto:)/i.test(u))x('createLink',u)};
-$('tb').onclick=()=>x('insertHTML','<table>'+('<tr>'+'<td>&nbsp;</td>'.repeat(3)+'</tr>').repeat(3)+'</table><p><br></p>');
+/* ---------- tables ---------- */
+const CS='border:1px solid #8a9199;padding:4px 8px;vertical-align:top',BD={all:'1px solid #8a9199',light:'1px solid #c4c9cf',none:'0'},tt=$('tt'),tp=$('tp'),tg=$('tg');
+let selCells=[],lastCell=null,anc=null,pr=1,pc=1;
+const cellOf=n=>{if(!n)return null;const e=n.nodeType===1?n:n.parentElement;return e&&e.closest?e.closest('td,th'):null};
+const curCell=()=>{const s=getSelection(),c=s.rangeCount?cellOf(s.anchorNode):null;return c&&pg.contains(c)?c:(lastCell&&pg.contains(lastCell)?lastCell:null)};
+const grid=t=>{const g=[];[...t.rows].forEach((tr,r)=>{g[r]=g[r]||[];let c=0;[...tr.cells].forEach(td=>{while(g[r][c])c++;for(let i=0;i<Math.max(1,td.rowSpan);i++)for(let j=0;j<Math.max(1,td.colSpan);j++)(g[r+i]=g[r+i]||[])[c+j]=td;c+=Math.max(1,td.colSpan)})});return g};
+const pos=(g,td)=>{for(let r=0;r<g.length;r++){const c=g[r]?g[r].indexOf(td):-1;if(c>=0)return[r,c]}return[-1,-1]};
+const idxOf=(t,c)=>[...t.querySelectorAll('td,th')].indexOf(c);
+const mk=(like,t)=>{const th=like&&like.tagName==='TH',n=document.createElement(th?'th':'td');n.style.cssText=like?like.style.cssText:CS;if(!like&&t&&t.dataset.b)n.style.border=BD[t.dataset.b];if(!th)['backgroundColor','color','fontWeight','textAlign'].forEach(p=>n.style[p]='');n.innerHTML='<br>';return n};
+/* the rectangle of cells between two cells, grown so it never cuts through a merged cell */
+function rectCells(a,b){const g=grid(a.closest('table')),[ar,ac]=pos(g,a),[br,bc]=pos(g,b);let r1=Math.min(ar,br),c1=Math.min(ac,bc),r2=Math.max(ar+a.rowSpan-1,br+b.rowSpan-1),c2=Math.max(ac+a.colSpan-1,bc+b.colSpan-1),ch=true;
+while(ch){ch=false;for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++){const x=g[r]&&g[r][c];if(!x)continue;const[xr,xc]=pos(g,x);if(xr<r1||xc<c1||xr+x.rowSpan-1>r2||xc+x.colSpan-1>c2){r1=Math.min(r1,xr);c1=Math.min(c1,xc);r2=Math.max(r2,xr+x.rowSpan-1);c2=Math.max(c2,xc+x.colSpan-1);ch=true}}}
+const set=new Set();for(let r=r1;r<=r2;r++)for(let c=c1;c<=c2;c++)if(g[r]&&g[r][c])set.add(g[r][c]);return[...set]}
+function unmerge(t,td){const g=grid(t),[r,c]=pos(g,td),rs=td.rowSpan,cs=td.colSpan;if(rs<2&&cs<2)return;td.removeAttribute('rowspan');td.removeAttribute('colspan');
+for(let i=0;i<rs;i++)for(let j=0;j<cs;j++){if(!i&&!j)continue;const tr=t.rows[r+i];if(!tr)continue;let ref=null;for(let k=c+j+1;k<(g[r+i]||[]).length;k++){const x=g[r+i][k];if(x&&x!==td&&x.parentNode===tr){ref=x;break}}tr.insertBefore(mk(td),ref)}}
+function mergeCells(t,cells){const g=grid(t);let r1=1e9,c1=1e9,r2=-1,c2=-1;cells.forEach(c=>{const[r,cc]=pos(g,c);r1=Math.min(r1,r);c1=Math.min(c1,cc);r2=Math.max(r2,r+c.rowSpan-1);c2=Math.max(c2,cc+c.colSpan-1)});
+const tl=g[r1][c1],parts=[];cells.forEach(c=>{if(c.textContent.trim()||c.querySelector('img'))parts.push(c.innerHTML.replace(/<br>$/,''))});
+tl.innerHTML=parts.join('<br>')||'<br>';cells.forEach(c=>{if(c!==tl)c.remove()});
+if(r2>r1)tl.rowSpan=r2-r1+1;else tl.removeAttribute('rowspan');if(c2>c1)tl.colSpan=c2-c1+1;else tl.removeAttribute('colspan');return{focus:idxOf(t,tl)}}
+function addRow(t,c,after){const g=grid(t),[r]=pos(g,c),i=after?r+Math.max(1,c.rowSpan):r,tr=document.createElement('tr'),done=new Set(),n=Math.max(...g.map(x=>x?x.length:0));
+for(let j=0;j<n;j++){const up=g[i-1]&&g[i-1][j],dn=g[i]&&g[i][j];if(up&&dn&&up===dn){if(!done.has(up)){up.rowSpan++;done.add(up)}continue}
+tr.appendChild(mk(up&&up.tagName==='TD'?up:dn&&dn.tagName==='TD'?dn:null,t))}
+const ref=t.rows[i];if(ref)ref.parentNode.insertBefore(tr,ref);else t.rows[t.rows.length-1].parentNode.appendChild(tr);return{focus:idxOf(t,tr.cells[0])}}
+function delRows(t,cells){const g=grid(t);let r1=1e9,r2=-1;cells.forEach(c=>{const[r]=pos(g,c);r1=Math.min(r1,r);r2=Math.max(r2,r+c.rowSpan-1)});
+for(let r=r1;r<=r2;r++)new Set(g[r]).forEach(x=>{if(x&&x.rowSpan>1)unmerge(t,x)});
+for(let r=r2;r>=r1;r--)if(t.rows[r])t.rows[r].remove();if(!t.rows.length)return{remove:true};return{focus:idxOf(t,t.rows[Math.min(r1,t.rows.length-1)].cells[0])}}
+function addCol(t,c,after){const g=grid(t),[r0,c0]=pos(g,c),idx=after?c0+Math.max(1,c.colSpan):c0,done=new Set();let first=null;
+g.forEach((row,r)=>{if(!row||!t.rows[r])return;const lf=row[idx-1],rt=row[idx];if(lf&&rt&&lf===rt){if(!done.has(lf)){lf.colSpan++;done.add(lf)}return}
+const tr=t.rows[r];let ref=null;for(const x of tr.cells){if(pos(g,x)[1]>=idx){ref=x;break}}const n=mk(lf||rt,t);tr.insertBefore(n,ref);if(r===r0)first=n});return{focus:first?idxOf(t,first):0}}
+function delCols(t,cells){let g=grid(t),c1=1e9,c2=-1;cells.forEach(c=>{const cc=pos(g,c)[1];c1=Math.min(c1,cc);c2=Math.max(c2,cc+c.colSpan-1)});
+for(let c=c1;c<=c2;c++)new Set(g.map(r=>r&&r[c])).forEach(x=>{if(x&&x.colSpan>1)unmerge(t,x)});
+g=grid(t);const rm=new Set();for(let c=c1;c<=c2;c++)g.forEach(r=>{if(r&&r[c])rm.add(r[c])});rm.forEach(x=>x.remove());[...t.rows].forEach(tr=>{if(!tr.cells.length)tr.remove()});
+if(!t.rows.length)return{remove:true};return{focus:0}}
+function toggleHead(t){const f=t.rows[0];if(!f)return;const on=[...f.cells].every(c=>c.tagName==='TH');
+[...f.cells].forEach(c=>{const n=document.createElement(on?'td':'th');[...c.attributes].forEach(a=>n.setAttribute(a.name,a.value));n.innerHTML=c.innerHTML;
+if(on){['backgroundColor','color','fontWeight','textAlign'].forEach(p=>n.style[p]='');n.removeAttribute('scope')}else{n.style.fontWeight='700';n.style.backgroundColor='#dfe3e8';n.style.color='#1f2328';n.style.textAlign='left';n.setAttribute('scope','col')}c.replaceWith(n)})}
+const lum=h=>{const n=parseInt(h.slice(1),16),f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};return .2126*f(n>>16)+.7152*f(n>>8&255)+.0722*f(n&255)};
+const shade=(cs,col)=>cs.forEach(c=>{if(col){c.style.backgroundColor=col;c.style.color=lum(col)>.4?'#1f2328':'#ffffff'}else{c.style.backgroundColor='';c.style.color=''}});
+const setBorders=(t,m)=>{t.dataset.b=m;t.querySelectorAll('td,th').forEach(c=>{c.style.border=BD[m]})};
+/* every change replaces the table through execCommand, so Ctrl+Z / Ctrl+Y undo and redo it */
+function put(c){if(!c)return;const r=document.createRange();r.selectNodeContents(c);r.collapse(!c.textContent);const s=getSelection();s.removeAllRanges();s.addRange(r);lastCell=c;sync()}
+function setSel(cs){selCells.forEach(c=>c.classList.remove('tsel'));selCells=cs;cs.forEach(c=>c.classList.add('tsel'));sync()}
+const clearSel=()=>{if(selCells.length)setSel([])};
+function edit(fn,fi){const c=curCell()||selCells[0];if(!c)return;const t=c.closest('table'),ti=[...pg.querySelectorAll('table')].indexOf(t),all=[...t.querySelectorAll('td,th')],idx=(selCells.length?selCells:[c]).map(x=>all.indexOf(x)),ci=all.indexOf(c);
+const cl=t.cloneNode(true);cl.querySelectorAll('.tsel').forEach(x=>{x.classList.remove('tsel');if(!x.getAttribute('class'))x.removeAttribute('class')});
+const ca=[...cl.querySelectorAll('td,th')],out=fn(cl,idx.map(i=>ca[i]),ca[ci]);if(out===false)return;clearSel();
+const r=document.createRange();r.selectNode(t);const s=getSelection();s.removeAllRanges();s.addRange(r);pg.focus();
+if(out&&out.remove){document.execCommand('insertHTML',false,'<p><br></p>');lastCell=null;sync();return}
+document.execCommand('insertHTML',false,cl.outerHTML);
+const nt=pg.querySelectorAll('table')[ti];if(nt){const nc=[...nt.querySelectorAll('td,th')];put(nc[Math.min(fi!=null?fi:out&&out.focus!=null?out.focus:ci,nc.length-1)])}}
+function act(k){const L=a=>a[a.length-1];
+if(k==='rowa')edit((t,cs)=>addRow(t,cs[0],false));else if(k==='rowb')edit((t,cs)=>addRow(t,L(cs),true));
+else if(k==='rowd')edit((t,cs)=>delRows(t,cs));else if(k==='cola')edit((t,cs)=>addCol(t,cs[0],false));else if(k==='colb')edit((t,cs)=>addCol(t,L(cs),true));
+else if(k==='cold')edit((t,cs)=>delCols(t,cs));
+else if(k==='merge')edit((t,cs)=>{if(cs.length>1)return mergeCells(t,cs);if(cs[0].rowSpan>1||cs[0].colSpan>1){unmerge(t,cs[0]);return}say('Drag across two or more cells first');return false});
+else if(k==='head')edit(t=>toggleHead(t));else if(k==='nofill')edit((t,cs)=>shade(cs,''));else if(k==='del')edit(()=>({remove:true}))}
+function sync(){const on=!!(lastCell&&pg.contains(lastCell))||selCells.length>0;tt.classList.toggle('on',on);if(!on)return;const c=selCells[0]||lastCell,t=c&&c.closest('table');if(t)$('tbd').value=t.dataset.b||'all';
+tt.querySelector('[data-t=merge]').textContent=selCells.length<2&&c&&(c.rowSpan>1||c.colSpan>1)?'Split':'Merge'}
+function step(d){const c=curCell(),t=c.closest('table'),all=[...t.querySelectorAll('td,th')],i=all.indexOf(c)+d;if(i<0)return;if(i<all.length)return put(all[i]);edit((t2,cs)=>addRow(t2,cs[0],true),all.length)}
+tt.querySelectorAll('button').forEach(b=>{b.onmousedown=e=>e.preventDefault();b.onclick=()=>act(b.dataset.t)});
+$('tf').onchange=e=>edit((t,cs)=>{shade(cs,e.target.value)});$('tbd').onchange=e=>edit(t=>{setBorders(t,e.target.value)});
+document.addEventListener('selectionchange',()=>{const s=getSelection();if(s.rangeCount&&pg.contains(s.anchorNode)){lastCell=cellOf(s.anchorNode);sync()}});
+pg.addEventListener('mousedown',e=>{clearSel();anc=e.button?null:cellOf(e.target)});
+pg.addEventListener('mouseover',e=>{if(!anc||!(e.buttons&1))return;const c=cellOf(e.target);if(!c||c.closest('table')!==anc.closest('table'))return;if(c===anc&&!selCells.length)return;
+const cs=rectCells(anc,c);if(cs.length<2){clearSel();return}pg.classList.add('dsel');setSel(cs);getSelection().removeAllRanges()});
+addEventListener('mouseup',()=>{anc=null;pg.classList.remove('dsel')});
+pg.addEventListener('keydown',e=>{
+if(selCells.length){if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();edit((t,cs)=>{cs.forEach(c=>{c.innerHTML='<br>'})});return}if(e.key==='Escape'){clearSel();return}if(!e.ctrlKey&&!e.metaKey){const f=selCells[0];clearSel();put(f)}return}
+if(e.key==='Tab'&&curCell()){e.preventDefault();step(e.shiftKey?-1:1)}});
+/* insert: pick a size on a grid */
+const tableHTML=(r,c,head)=>{let h='<table data-b="all" data-new="1" style="border-collapse:collapse;width:100%;table-layout:fixed">';for(let i=0;i<r;i++){h+='<tr>';for(let j=0;j<c;j++)h+=head&&!i?'<th scope="col" style="'+CS+';font-weight:700;background-color:#dfe3e8;color:#1f2328;text-align:left"><br></th>':'<td style="'+CS+'"><br></td>';h+='</tr>'}return h+'</table><p><br></p>'};
+for(let i=0;i<64;i++)tg.insertAdjacentHTML('beforeend','<i data-r="'+(i>>3)+'" data-c="'+(i&7)+'"></i>');
+const hl=(r,c)=>{pr=r;pc=c;[...tg.children].forEach((e,i)=>e.classList.toggle('h',(i>>3)<r&&(i&7)<c));$('tl').textContent=r+' × '+c};
+tg.onmouseover=e=>{const i=e.target.closest('i');if(i)hl(+i.dataset.r+1,+i.dataset.c+1)};
+tg.onclick=e=>{const i=e.target.closest('i');if(!i)return;hl(+i.dataset.r+1,+i.dataset.c+1);tp.classList.remove('on');x('insertHTML',tableHTML(pr,pc,$('th').checked));
+const t=pg.querySelector('table[data-new]');if(t){t.removeAttribute('data-new');put(t.querySelector('td,th'))}};
+$('tb').onclick=e=>{e.stopPropagation();const r=$('tb').getBoundingClientRect();tp.style.left=Math.max(4,Math.min(r.left,innerWidth-200))+'px';tp.style.top=r.bottom+4+'px';tp.classList.toggle('on');hl(1,1)};
+addEventListener('click',e=>{if(!tp.contains(e.target))tp.classList.remove('on')});
+addEventListener('keydown',e=>{if(e.key==='Escape')tp.classList.remove('on')});
+
 pg.addEventListener('input',()=>{stat();persist()});
 pg.addEventListener('paste',e=>{e.preventDefault();const d=e.clipboardData,h=d.getData('text/html');document.execCommand('insertHTML',false,h?Scribae.clean(h):esc(d.getData('text/plain')).replace(/\r?\n/g,'<br>'))});
 $('nw').onclick=()=>{if(dirty&&!confirm('Discard unsaved changes?'))return;setHtml('<p><br></p>','Untitled document')};
