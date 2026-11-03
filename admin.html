@@ -29,14 +29,16 @@ function render(us,s){m.innerHTML='<h3>Users ('+us.length+')</h3><div style="ove
 +'<p>Credits: grant <input id="ga" type="number" min="0" value="'+s.grant.amount+'" style="width:80px"> to every active user every <input id="gh" type="number" min="0" value="'+s.grant.everyHours+'" style="width:70px"> hours (0 = off) <button id="gn">Grant to all now</button></p>'
 +'<p>API keys: deliver every active user a fresh key every <input id="kd" type="number" min="0" value="'+s.keyPush.everyDays+'" style="width:70px"> days (0 = off), each valid for <input id="kl" type="number" min="1" value="'+s.keyPush.lifeDays+'" style="width:70px"> days <button id="pk">Deliver keys now</button></p><p><button id="sv">Save settings</button></p>'
 +'<h3>Add a user</h3><p><input id="nn" placeholder="Username"> <input id="np" placeholder="Temporary password (8+ characters)"> <select id="nr"><option value="user">User</option><option value="admin">Admin</option></select> <button id="au">Add user</button></p>'
-+'<p class="mu">Passwords are stored only as salted scrypt hashes and cannot be viewed by anyone. “Reset password” issues a temporary one, shown once.</p>'}
++'<p class="mu">Passwords are never sent to the server in readable form, so nobody can view them. “Reset password” issues a one-time reset code, shown once.</p>'}
 async function boot(){await Scribae.ready;
 if(!Scribae.online){m.innerHTML='<p>No Scribae server is reachable. Check <code>api</code> in <code>config.js</code> and that <code>server.js</code> is running.</p>';return}
+if(Scribae.info&&Scribae.info.setup){m.innerHTML='<h3>Create the first admin</h3><p class="mu">Use the setup code you stored as the SETUP_CODE secret.</p><input id="su" placeholder="Admin username"> <input id="sp" type="password" placeholder="Password (8+ characters)"> <input id="sc" type="password" placeholder="Setup code"> <button id="sg">Create admin</button> <span id="er" class="mu"></span>';
+$('#sg').onclick=async()=>{try{const n=$('#su').value.trim(),p=$('#sp').value;if(p.length<8)throw new Error('Password must be 8+ characters');$('#er').textContent='Working…';await Scribae.api('/setup',{m:'POST',b:{user:n,pw:await Scribae.derive(n,p),code:$('#sc').value}});await Scribae.login(n,p);location.reload()}catch(e){$('#er').textContent=e.message}};return}
 if(!Scribae.me){m.innerHTML='<h3>Admin sign-in</h3><input id="u" placeholder="Username" autocomplete="username"> <input id="p" type="password" placeholder="Password" autocomplete="current-password"> <button id="go">Sign in</button> <span id="er" class="mu"></span>';$('#go').onclick=async()=>{try{await Scribae.login($('#u').value.trim(),$('#p').value);boot()}catch(e){$('#er').textContent=e.message}};return}
 if(Scribae.me.role!=='admin'){m.innerHTML='<p>This page is for admins only.</p>';return}
 try{const[u,s]=await Promise.all([A('/users'),A('/settings')]);render(u.users,s)}catch(e){m.textContent=e.message}}
 m.onclick=async e=>{const b=e.target,a=b.dataset.a,i=b.dataset.i;try{
-if(a==='reset'){if(!confirm('Reset the password for '+b.dataset.n+'?'))return;const r=await A('/users/'+i,{m:'POST',b:{action:'reset'}});alert('Temporary password for '+b.dataset.n+':\n\n'+r.temp+'\n\nShown once. They should change it after signing in.')}
+if(a==='reset'){if(!confirm('Reset the password for '+b.dataset.n+'?'))return;const r=await A('/users/'+i,{m:'POST',b:{action:'reset'}});alert('Reset code for '+b.dataset.n+':\n\n'+r.code+'\n\nValid for 24 hours and shown once. They choose "Reset with code" in the sign-in box. Their old password stops working now.')}
 else if(a==='tokens'){const v=prompt('Set credit balance for '+b.dataset.n);if(v===null)return;await A('/users/'+i,{m:'POST',b:{action:'tokens',value:v}})}
 else if(a==='delete'){if(!confirm('Permanently delete '+b.dataset.n+' and all of their files?'))return;await A('/users/'+i,{m:'POST',b:{action:'delete'}})}
 else if(a==='disable'||a==='role')await A('/users/'+i,{m:'POST',b:{action:a}});
@@ -44,7 +46,7 @@ else if(b.id==='sv')await A('/settings',{m:'PUT',b:{open:$('#op').checked,grant:
 else if(b.id==='gn'){if(!confirm('Add the grant amount to every active user now?'))return;await A('/grant',{m:'POST',b:{amount:+$('#ga').value}})}
 else if(a==='revokekeys'){if(!confirm('Revoke every API key (and undelivered key) for '+b.dataset.n+'?'))return;await A('/users/'+i,{m:'POST',b:{action:'revokekeys'}})}
 else if(b.id==='pk'){if(!confirm('Deliver a fresh key to every active user now?'))return;await A('/push-keys',{m:'POST',b:{}})}
-else if(b.id==='au'){await A('/users',{m:'POST',b:{name:$('#nn').value.trim(),pass:$('#np').value,role:$('#nr').value}})}
+else if(b.id==='au'){const n=$('#nn').value.trim(),p=$('#np').value;if(p.length<8){alert('Password must be 8+ characters');return}await A('/users',{m:'POST',b:{name:n,pw:await Scribae.derive(n,p),role:$('#nr').value}})}
 else return;boot()}catch(x){alert(x.message)}};
 boot();
 </script>
