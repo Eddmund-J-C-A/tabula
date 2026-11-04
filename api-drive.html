@@ -7,11 +7,16 @@
   <style>
     :root { color-scheme: light dark; font: 16px system-ui, sans-serif; }
     body { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { margin-bottom: .35rem; }
+    header { display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid #8885; padding-bottom: .8rem; }
+    header a { color: inherit; }
+    h1 { margin: 0; font-size: 1.4rem; }
     .muted, #status { color: #777; }
-    form { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.2rem 0; }
-    input { flex: 1 1 24rem; min-width: 12rem; padding: .65rem; }
-    button { padding: .6rem .9rem; cursor: pointer; }
+    .notice { padding: .8rem; border: 1px solid #c99a45; border-radius: .4rem; }
+    form { display: grid; grid-template-columns: max-content minmax(12rem, 1fr) max-content; align-items: center; gap: .65rem; margin: 1.2rem 0; }
+    input, select { min-width: 0; padding: .6rem; font: inherit; }
+    button { padding: .6rem .9rem; font: inherit; cursor: pointer; }
+    .wide { grid-column: 2 / -1; }
+    .saved-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
     #files { list-style: none; padding: 0; }
     #files li { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; padding: .8rem 0; border-bottom: 1px solid #8885; }
     .file-name { flex: 1 1 14rem; overflow-wrap: anywhere; }
@@ -19,20 +24,36 @@
     #preview { margin-top: 1.5rem; }
     pre { max-height: 65vh; overflow: auto; padding: 1rem; border: 1px solid #8885; border-radius: .4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
     [hidden] { display: none !important; }
+    @media (max-width: 600px) { form { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
   </style>
   <script src="config.js"></script>
 </head>
 <body>
-  <h1>Tabula API Drive Viewer</h1>
-  <p class="muted">Enter a Tabula API key with <code>read</code> permission to list and preview that account’s Drive files.</p>
+  <header>
+    <a href="index.html" title="Return to the main page">← Main page</a>
+    <h1>Tabula API Drive Viewer</h1>
+  </header>
+  <p class="muted">Connect with an API key that has <code>read</code> permission to list and preview that account’s Drive files.</p>
+  <p class="notice"><strong>Key storage:</strong> remembered keys are stored in this browser’s local storage without encryption. Only remember a key on a device you trust. The API does not reveal the original key name here, so you can give each saved key your own label.</p>
 
   <form id="connect-form">
     <label for="api-key">API key</label>
     <input id="api-key" type="password" autocomplete="off" spellcheck="false" required placeholder="scr_…">
     <button type="submit">Connect</button>
-    <button id="clear-button" type="button">Clear key</button>
+    <label for="key-label">Label for this key</label>
+    <input id="key-label" class="wide" type="text" maxlength="60" placeholder="e.g. Personal read-only key">
+    <span></span>
+    <label class="wide"><input id="remember-key" type="checkbox"> Remember this key in this browser after a successful connection</label>
   </form>
-  <p id="status" role="status" aria-live="polite">The key is kept only in this page and is not saved to browser storage.</p>
+
+  <div class="saved-row">
+    <label for="saved-keys">Saved keys</label>
+    <select id="saved-keys"><option value="">None saved</option></select>
+    <button id="load-key" type="button">Use selected</button>
+    <button id="forget-key" type="button">Forget selected</button>
+    <button id="clear-button" type="button">Clear current key</button>
+  </div>
+  <p id="status" role="status" aria-live="polite">The current key is kept only in memory unless you choose to remember it.</p>
   <ul id="files" aria-label="Drive files"></ul>
   <section id="preview" hidden>
     <h2 id="preview-title"></h2>
@@ -43,12 +64,51 @@
     'use strict';
     const form = document.querySelector('#connect-form');
     const keyField = document.querySelector('#api-key');
+    const labelField = document.querySelector('#key-label');
+    const rememberField = document.querySelector('#remember-key');
+    const savedSelect = document.querySelector('#saved-keys');
     const status = document.querySelector('#status');
     const filesEl = document.querySelector('#files');
     const preview = document.querySelector('#preview');
     const previewTitle = document.querySelector('#preview-title');
     const previewContent = document.querySelector('#preview-content');
+    const SAVED_KEYS = 'tabula.apiDrive.savedKeys';
     let activeKey = '';
+
+    function readSavedKeys() {
+      try {
+        const value = JSON.parse(localStorage.getItem(SAVED_KEYS) || '[]');
+        return Array.isArray(value) ? value.filter(x => x && typeof x.id === 'string' && typeof x.name === 'string' && typeof x.key === 'string') : [];
+      } catch (_) { return []; }
+    }
+
+    function renderSavedKeys(selectedId = '') {
+      const saved = readSavedKeys();
+      savedSelect.replaceChildren();
+      if (!saved.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'None saved';
+        savedSelect.append(option);
+        return;
+      }
+      for (const item of saved) {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = item.name;
+        option.selected = item.id === selectedId;
+        savedSelect.append(option);
+      }
+    }
+
+    function rememberKey(name, key) {
+      const saved = readSavedKeys();
+      const id = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+      const entry = { id, name: name.trim() || 'Saved API key', key };
+      saved.push(entry);
+      localStorage.setItem(SAVED_KEYS, JSON.stringify(saved));
+      renderSavedKeys(id);
+    }
 
     function apiBase() {
       const configured = window.SCRIBAE_CONFIG && window.SCRIBAE_CONFIG.api;
@@ -78,11 +138,16 @@
       const date = file.updated ? new Date(file.updated).toLocaleString() : 'Date unknown';
       const size = Number.isFinite(Number(file.size)) ? ` · ${Number(file.size).toLocaleString()} characters` : '';
       meta.textContent = `${file.kind || 'file'} · ${date}${size}`;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = 'Preview';
-      button.addEventListener('click', () => loadFile(file, button));
-      li.append(name, meta, button);
+      const previewButton = document.createElement('button');
+      previewButton.type = 'button';
+      previewButton.textContent = 'Preview';
+      previewButton.addEventListener('click', () => loadFile(file, previewButton));
+      const launchButton = document.createElement('button');
+      launchButton.type = 'button';
+      launchButton.textContent = file.kind === 'sheet' ? 'Open copy in Sheets' : file.kind === 'doc' ? 'Open copy in Docs' : 'App unavailable';
+      launchButton.disabled = !['sheet', 'doc'].includes(file.kind);
+      launchButton.addEventListener('click', () => launchCopy(file, launchButton));
+      li.append(name, meta, previewButton, launchButton);
       filesEl.append(li);
     }
 
@@ -92,13 +157,56 @@
       try {
         const data = await api('/files/' + encodeURIComponent(file.id));
         previewTitle.textContent = data.name || file.name || 'Untitled';
-        previewContent.textContent = typeof data.content === 'string'
-          ? data.content
-          : JSON.stringify(data.content, null, 2);
+        previewContent.textContent = typeof data.content === 'string' ? data.content : JSON.stringify(data.content, null, 2);
         preview.hidden = false;
         setStatus('File loaded.');
       } catch (error) {
         setStatus(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function launchCopy(file, button) {
+      button.disabled = true;
+      const app = file.kind === 'sheet' ? 'tabula.html' : file.kind === 'doc' ? 'docs.html' : '';
+      const draftKey = file.kind === 'sheet' ? 'tabula.draft' : 'scribae.doc.draft';
+      if (!app) { button.disabled = false; return; }
+      let data;
+      try {
+        data = JSON.parse(previewContent.textContent);
+      } catch (_) {
+        setStatus('Preview this file first, then open it in its app.');
+        button.disabled = false;
+        return;
+      }
+      if (!data || typeof data.content !== 'string') {
+        setStatus('Could not read the file content. Preview it again and retry.');
+        button.disabled = false;
+        return;
+      }
+      const win = window.open('about:blank', '_blank');
+      if (!win) {
+        setStatus('The browser blocked the new tab. Allow pop-ups for this site and try again.');
+        button.disabled = false;
+        return;
+      }
+      let previous;
+      try {
+        previous = localStorage.getItem(draftKey);
+        localStorage.setItem(draftKey, data.content);
+        win.location.href = new URL(app, location.href).href;
+        // The app loads this as a local working copy. Restore the prior local draft after its startup read.
+        setTimeout(() => {
+          try {
+            if (previous === null) localStorage.removeItem(draftKey);
+            else localStorage.setItem(draftKey, previous);
+          } catch (_) {}
+        }, 1500);
+        setStatus(`Opened a local copy of “${data.name || file.name || 'Untitled'}” in ${file.kind === 'sheet' ? 'Sheets' : 'Docs'}. The API-stored file was not changed.`);
+      } catch (error) {
+        try { win.close(); } catch (_) {}
+        setStatus('Could not open this copy. Make sure this page and the app are served from the same site.');
       } finally {
         button.disabled = false;
       }
@@ -111,6 +219,7 @@
       activeKey = candidate;
       filesEl.replaceChildren();
       preview.hidden = true;
+      previewContent.textContent = '';
       setStatus('Connecting…');
       const submit = form.querySelector('button[type="submit"]');
       submit.disabled = true;
@@ -118,7 +227,16 @@
         const data = await api('/files');
         const files = Array.isArray(data.files) ? data.files : [];
         files.forEach(showFile);
-        setStatus(files.length ? `${files.length} file(s) found.` : 'No files found in this Drive.');
+        if (rememberField.checked) {
+          try {
+            rememberKey(labelField.value, candidate);
+            setStatus(`${files.length} file(s) found. This key was remembered in this browser.`);
+          } catch (_) {
+            setStatus(`${files.length} file(s) found, but the browser could not store the key.`);
+          }
+        } else {
+          setStatus(files.length ? `${files.length} file(s) found.` : 'No files found in this Drive.');
+        }
       } catch (error) {
         activeKey = '';
         setStatus(error.message);
@@ -127,13 +245,35 @@
       }
     });
 
+    document.querySelector('#load-key').addEventListener('click', () => {
+      const saved = readSavedKeys().find(x => x.id === savedSelect.value);
+      if (!saved) return setStatus('Choose a saved key first.');
+      keyField.value = saved.key;
+      labelField.value = saved.name;
+      rememberField.checked = false;
+      setStatus(`Loaded “${saved.name}”. Connect to use it.`);
+    });
+
+    document.querySelector('#forget-key').addEventListener('click', () => {
+      const id = savedSelect.value;
+      if (!id) return setStatus('Choose a saved key to forget.');
+      const saved = readSavedKeys();
+      const forgotten = saved.find(x => x.id === id);
+      localStorage.setItem(SAVED_KEYS, JSON.stringify(saved.filter(x => x.id !== id)));
+      renderSavedKeys();
+      setStatus(`Forgot “${forgotten ? forgotten.name : 'saved key'}” in this browser. This does not revoke the key on the server.`);
+    });
+
     document.querySelector('#clear-button').addEventListener('click', () => {
       activeKey = '';
       keyField.value = '';
       filesEl.replaceChildren();
       preview.hidden = true;
-      setStatus('Key cleared from this page.');
+      previewContent.textContent = '';
+      setStatus('Current key cleared from this page. Remembered keys are unchanged.');
     });
+
+    renderSavedKeys();
   </script>
 </body>
 </html>
