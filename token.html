@@ -34,8 +34,8 @@
     <h1>Upload JSON to your Drive</h1>
   </header>
   <main>
-    <p class="notice"><strong>One credit per file:</strong> this page spends one credit before uploading each valid file. Use an API key with both <code>write</code> and <code>credits</code> permissions. Credits are not refunded if a file upload fails after its credit is spent.</p>
-    <p class="hint">Only native Tabula spreadsheet (<code>format: "tabula"</code>) and Scribae document (<code>format: "scribae-doc"</code>) JSON files are accepted. Your API key is used only in this page’s memory and is never saved by this page. Use it only on a device you trust.</p>
+    <p class="notice"><strong>One credit per file:</strong> this page spends one credit before uploading each valid JSON file. Use an API key with both <code>write</code> and <code>credits</code> permissions. Credits are not refunded if a file upload fails after its credit is spent.</p>
+    <p class="hint">Any valid <code>.json</code> file is accepted. Native Tabula spreadsheets and Scribae documents keep their usual Drive type. Other JSON is stored unchanged as a generic Drive document; it won't necessarily open as an editable Docs or Sheets file. Your API key is used only in this page's memory and is never saved by this page. Use it only on a device you trust.</p>
 
     <form id="upload-form">
       <label for="api-key">API key</label>
@@ -80,10 +80,9 @@
     function fileInfo(file, raw) {
       const parsed = JSON.parse(raw);
       const kind = parsed && parsed.format === 'tabula' ? 'sheet' :
-        parsed && parsed.format === 'scribae-doc' ? 'doc' : null;
-      if (!kind) throw new Error('not a native Tabula or Scribae JSON file');
+        parsed && parsed.format === 'scribae-doc' ? 'doc' : 'doc';
       const fallbackName = file.name.replace(/\.json$/i, '').replace(/\.(tabula|scribae-doc)$/i, '');
-      const name = String(parsed.name || fallbackName || 'Untitled').slice(0, 120);
+      const name = String(parsed && typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name : fallbackName || 'Untitled').slice(0, 120);
       return { name, kind, content: raw };
     }
 
