@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tabula API Drive Viewer</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px system-ui, sans-serif; }
+    body { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: .35rem; }
+    .muted, #status { color: #777; }
+    form { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.2rem 0; }
+    input { flex: 1 1 24rem; min-width: 12rem; padding: .65rem; }
+    button { padding: .6rem .9rem; cursor: pointer; }
+    #files { list-style: none; padding: 0; }
+    #files li { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; padding: .8rem 0; border-bottom: 1px solid #8885; }
+    .file-name { flex: 1 1 14rem; overflow-wrap: anywhere; }
+    .file-meta { color: #777; font-size: .9rem; }
+    #preview { margin-top: 1.5rem; }
+    pre { max-height: 65vh; overflow: auto; padding: 1rem; border: 1px solid #8885; border-radius: .4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+    [hidden] { display: none !important; }
+  </style>
+  <script src="config.js"></script>
+</head>
+<body>
+  <h1>Tabula API Drive Viewer</h1>
+  <p class="muted">Enter a Tabula API key with <code>read</code> permission to list and preview that account’s Drive files.</p>
+
+  <form id="connect-form">
+    <label for="api-key">API key</label>
+    <input id="api-key" type="password" autocomplete="off" spellcheck="false" required placeholder="scr_…">
+    <button type="submit">Connect</button>
+    <button id="clear-button" type="button">Clear key</button>
+  </form>
+  <p id="status" role="status" aria-live="polite">The key is kept only in this page and is not saved to browser storage.</p>
+  <ul id="files" aria-label="Drive files"></ul>
+  <section id="preview" hidden>
+    <h2 id="preview-title"></h2>
+    <pre id="preview-content"></pre>
+  </section>
+
+  <script>
+    'use strict';
+    const form = document.querySelector('#connect-form');
+    const keyField = document.querySelector('#api-key');
+    const status = document.querySelector('#status');
+    const filesEl = document.querySelector('#files');
+    const preview = document.querySelector('#preview');
+    const previewTitle = document.querySelector('#preview-title');
+    const previewContent = document.querySelector('#preview-content');
+    let activeKey = '';
+
+    function apiBase() {
+      const configured = window.SCRIBAE_CONFIG && window.SCRIBAE_CONFIG.api;
+      if (!configured) throw new Error('No API server is configured. Check config.js.');
+      return configured.replace(/\/$/, '') + '/api';
+    }
+
+    async function api(path) {
+      const response = await fetch(apiBase() + path, {
+        headers: { Authorization: 'Bearer ' + activeKey }
+      });
+      let data;
+      try { data = await response.json(); } catch (_) { data = {}; }
+      if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
+      return data;
+    }
+
+    function setStatus(message) { status.textContent = message; }
+
+    function showFile(file) {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.className = 'file-name';
+      name.textContent = file.name || 'Untitled';
+      const meta = document.createElement('span');
+      meta.className = 'file-meta';
+      const date = file.updated ? new Date(file.updated).toLocaleString() : 'Date unknown';
+      const size = Number.isFinite(Number(file.size)) ? ` · ${Number(file.size).toLocaleString()} characters` : '';
+      meta.textContent = `${file.kind || 'file'} · ${date}${size}`;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Preview';
+      button.addEventListener('click', () => loadFile(file, button));
+      li.append(name, meta, button);
+      filesEl.append(li);
+    }
+
+    async function loadFile(file, button) {
+      button.disabled = true;
+      setStatus(`Loading “${file.name || 'Untitled'}”…`);
+      try {
+        const data = await api('/files/' + encodeURIComponent(file.id));
+        previewTitle.textContent = data.name || file.name || 'Untitled';
+        previewContent.textContent = typeof data.content === 'string'
+          ? data.content
+          : JSON.stringify(data.content, null, 2);
+        preview.hidden = false;
+        setStatus('File loaded.');
+      } catch (error) {
+        setStatus(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const candidate = keyField.value.trim();
+      if (!candidate) return;
+      activeKey = candidate;
+      filesEl.replaceChildren();
+      preview.hidden = true;
+      setStatus('Connecting…');
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      try {
+        const data = await api('/files');
+        const files = Array.isArray(data.files) ? data.files : [];
+        files.forEach(showFile);
+        setStatus(files.length ? `${files.length} file(s) found.` : 'No files found in this Drive.');
+      } catch (error) {
+        activeKey = '';
+        setStatus(error.message);
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    document.querySelector('#clear-button').addEventListener('click', () => {
+      activeKey = '';
+      keyField.value = '';
+      filesEl.replaceChildren();
+      preview.hidden = true;
+      setStatus('Key cleared from this page.');
+    });
+  </script>
+</body>
+</html>
