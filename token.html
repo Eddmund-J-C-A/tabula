@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#193a34">
+  <title>Token Upload · The Scriptorium</title>
+  <script src="config.js"></script>
+  <style>
+    :root { color-scheme: light; font: 16px system-ui, -apple-system, "Segoe UI", sans-serif; color: #23342f; background: #f5f0e5; }
+    * { box-sizing: border-box; }
+    body { max-width: 760px; margin: 0 auto; padding: 1.5rem; }
+    header { display: flex; align-items: center; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #193a3426; }
+    header a { color: #89672f; }
+    h1 { margin: 0; color: #193a34; font: normal 1.6rem Georgia, serif; }
+    main { margin-top: 2rem; }
+    .notice { padding: 1rem; border: 1px solid #c49a55; border-radius: .5rem; background: #fffdf7; line-height: 1.55; }
+    form { display: grid; gap: .75rem; margin-top: 1.5rem; }
+    label { font-weight: 600; }
+    input, button { font: inherit; }
+    input[type="password"], input[type="file"] { width: 100%; padding: .7rem; border: 1px solid #193a3440; border-radius: .4rem; background: #fffdf7; color: inherit; }
+    button { justify-self: start; padding: .65rem 1rem; border: 1px solid #193a34; border-radius: 2rem; background: #193a34; color: white; cursor: pointer; }
+    button:hover:not(:disabled) { background: #28564b; }
+    button:disabled { opacity: .6; cursor: wait; }
+    #status { min-height: 1.5em; margin-top: 1.2rem; color: #66736b; }
+    #results { padding-left: 1.25rem; line-height: 1.6; overflow-wrap: anywhere; }
+    .hint { color: #66736b; font-size: .9rem; line-height: 1.5; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="index.html">← Main page</a>
+    <h1>Upload JSON to your Drive</h1>
+  </header>
+  <main>
+    <p class="notice"><strong>One credit per file:</strong> this page spends one credit before uploading each valid file. Use an API key with both <code>write</code> and <code>credits</code> permissions. Credits are not refunded if a file upload fails after its credit is spent.</p>
+    <p class="hint">Only native Tabula spreadsheet (<code>format: "tabula"</code>) and Scribae document (<code>format: "scribae-doc"</code>) JSON files are accepted. Your API key is used only in this page’s memory and is never saved by this page. Use it only on a device you trust.</p>
+
+    <form id="upload-form">
+      <label for="api-key">API key</label>
+      <input id="api-key" type="password" autocomplete="off" spellcheck="false" required placeholder="scr_…">
+      <label for="json-files">JSON files</label>
+      <input id="json-files" type="file" accept=".json,application/json" multiple required>
+      <button id="upload-button" type="submit">Spend credits and upload</button>
+    </form>
+    <p id="status" role="status" aria-live="polite">Choose one or more JSON files to upload.</p>
+    <ul id="results" aria-label="Upload results"></ul>
+  </main>
+  <script>
+    'use strict';
+    const form = document.querySelector('#upload-form');
+    const keyField = document.querySelector('#api-key');
+    const fileField = document.querySelector('#json-files');
+    const submitButton = document.querySelector('#upload-button');
+    const status = document.querySelector('#status');
+    const results = document.querySelector('#results');
+
+    function apiBase() {
+      const configured = window.SCRIBAE_CONFIG && window.SCRIBAE_CONFIG.api;
+      if (!configured) throw new Error('No API server is configured. Check config.js.');
+      return configured.replace(/\/$/, '') + '/api';
+    }
+
+    async function request(path, key, body) {
+      const response = await fetch(apiBase() + path, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: {
+          Authorization: 'Bearer ' + key,
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' })
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      });
+      let data;
+      try { data = await response.json(); } catch (_) { data = {}; }
+      if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
+      return data;
+    }
+
+    function fileInfo(file, raw) {
+      const parsed = JSON.parse(raw);
+      const kind = parsed && parsed.format === 'tabula' ? 'sheet' :
+        parsed && parsed.format === 'scribae-doc' ? 'doc' : null;
+      if (!kind) throw new Error('not a native Tabula or Scribae JSON file');
+      const fallbackName = file.name.replace(/\.json$/i, '').replace(/\.(tabula|scribae-doc)$/i, '');
+      const name = String(parsed.name || fallbackName || 'Untitled').slice(0, 120);
+      return { name, kind, content: raw };
+    }
+
+    function addResult(text) {
+      const item = document.createElement('li');
+      item.textContent = text;
+      results.append(item);
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const key = keyField.value.trim();
+      const files = Array.from(fileField.files || []);
+      if (!key || !files.length) return;
+      results.replaceChildren();
+      submitButton.disabled = true;
+      let uploaded = 0;
+      let failed = 0;
+      try {
+        for (let index = 0; index < files.length; index++) {
+          const file = files[index];
+          status.textContent = `Checking ${index + 1} of ${files.length}: ${file.name}`;
+          try {
+            if (!/\.json$/i.test(file.name)) throw new Error('only .json files are supported');
+            const item = fileInfo(file, await file.text());
+            status.textContent = `Spending one credit and uploading ${file.name} (${index + 1} of ${files.length})…`;
+            await request('/credits/spend', key, { amount: 1 });
+            await request('/files', key, item);
+            uploaded++;
+            addResult(`Uploaded: ${file.name} (1 credit spent)`);
+          } catch (error) {
+            failed++;
+            addResult(`Failed: ${file.name} — ${error.message || 'unknown error'}`);
+          }
+        }
+        status.textContent = `Finished: ${uploaded} uploaded, ${failed} failed.`;
+      } catch (error) {
+        status.textContent = error.message || 'Could not upload files.';
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
