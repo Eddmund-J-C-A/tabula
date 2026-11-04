@@ -104,8 +104,7 @@
     function rememberKey(name, key) {
       const saved = readSavedKeys();
       const id = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
-      const entry = { id, name: name.trim() || 'Saved API key', key };
-      saved.push(entry);
+      saved.push({ id, name: name.trim() || 'Saved API key', key });
       localStorage.setItem(SAVED_KEYS, JSON.stringify(saved));
       renderSavedKeys(id);
     }
@@ -128,6 +127,90 @@
 
     function setStatus(message) { status.textContent = message; }
 
+    function safeFilename(name) {
+      return String(name || 'tabula-file').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim() || 'tabula-file';
+    }
+
+    function downloadBlob(filename, content, mimeType) {
+      const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function csvFromSheet(content) {
+      const parsed = JSON.parse(content);
+      if (!parsed || parsed.format !== 'tabula' || !Array.isArray(parsed.sheets) || !parsed.sheets.length) {
+        throw new Error('This is not a recognized Tabula spreadsheet file. Download the native file instead.');
+      }
+      const active = Number.isInteger(parsed.active) ? parsed.active : 0;
+      const sheet = parsed.sheets[Math.max(0, Math.min(active, parsed.sheets.length - 1))];
+      const rows = Array.isArray(sheet.cells) ? sheet.cells : [];
+      const csv = rows.map(row => (Array.isArray(row) ? row : []).map(value => {
+        const text = value == null ? '' : String(value);
+        return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+      }).join(',')).join('\r\n');
+      return '\uFEFF' + csv;
+    }
+
+    function documentHtml(content, fallbackName) {
+      let html = content;
+      let title = fallbackName || 'Document';
+      try {
+        const doc = JSON.parse(content);
+        if (doc && doc.format === 'scribae-doc' && typeof doc.html === 'string') {
+          html = doc.html;
+          title = doc.name || title;
+        }
+      } catch (_) {}
+      if (/^\s*<!doctype|^\s*<html\b/i.test(html)) return html;
+      return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' +
+        escapeHtml(title) + '</title></head><body>' + html + '</body></html>';
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function textFromDocument(content, fallbackName) {
+      const html = documentHtml(content, fallbackName);
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      return doc.body.innerText || doc.body.textContent || '';
+    }
+
+    function downloadFormat(file, content, format) {
+      const base = safeFilename(file.name || 'tabula-file');
+      if (format === 'native') {
+        const ext = file.kind === 'sheet' ? '.tabula.json' : '.scribae-doc.json';
+        downloadBlob(base + ext, content, 'application/json;charset=utf-8');
+      } else if (format === 'csv' && file.kind === 'sheet') {
+        downloadBlob(base + '.csv', csvFromSheet(content), 'text/csv;charset=utf-8');
+      } else if (format === 'html' && file.kind === 'doc') {
+        downloadBlob(base + '.html', documentHtml(content, file.name), 'text/html;charset=utf-8');
+      } else if (format === 'txt' && file.kind === 'doc') {
+        downloadBlob(base + '.txt', textFromDocument(content, file.name), 'text/plain;charset=utf-8');
+      }
+    }
+
+    async function downloadFile(file, format, button) {
+      button.disabled = true;
+      setStatus(`Preparing download for “${file.name || 'Untitled'}”…`);
+      try {
+        const data = await api('/files/' + encodeURIComponent(file.id));
+        if (typeof data.content !== 'string') throw new Error('The API did not return file content in a usable format.');
+        downloadFormat(file, data.content, format);
+        setStatus(`Downloaded a copy of “${data.name || file.name || 'Untitled'}”. The Drive file was not changed.`);
+      } catch (error) {
+        setStatus(error.message || 'Could not download this file.');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     function showFile(file) {
       const li = document.createElement('li');
       const name = document.createElement('span');
@@ -147,7 +230,27 @@
       launchButton.textContent = file.kind === 'sheet' ? 'Open copy in Sheets' : file.kind === 'doc' ? 'Open copy in Docs' : 'App unavailable';
       launchButton.disabled = !['sheet', 'doc'].includes(file.kind);
       launchButton.addEventListener('click', () => launchCopy(file, launchButton));
-      li.append(name, meta, previewButton, launchButton);
+      const nativeButton = document.createElement('button');
+      nativeButton.type = 'button';
+      nativeButton.textContent = file.kind === 'sheet' ? 'Download .tabula.json' : 'Download Scribae doc';
+      nativeButton.disabled = !['sheet', 'doc'].includes(file.kind);
+      nativeButton.addEventListener('click', () => downloadFile(file, 'native', nativeButton));
+      li.append(name, meta, previewButton, launchButton, nativeButton);
+      if (file.kind === 'sheet') {
+        const csvButton = document.createElement('button');
+        csvButton.type = 'button';
+        csvButton.textContent = 'Download CSV';
+        csvButton.addEventListener('click', () => downloadFile(file, 'csv', csvButton));
+        li.append(csvButton);
+      } else if (file.kind === 'doc') {
+        for (const format of ['html', 'txt']) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = `Download .${format}`;
+          button.addEventListener('click', () => downloadFile(file, format, button));
+          li.append(button);
+        }
+      }
       filesEl.append(li);
     }
 
@@ -193,9 +296,7 @@
       if (!app) { button.disabled = false; return; }
       try {
         const data = await api('/files/' + encodeURIComponent(file.id));
-        if (typeof data.content !== 'string') {
-          throw new Error('The API did not return file content in a usable format.');
-        }
+        if (typeof data.content !== 'string') throw new Error('The API did not return file content in a usable format.');
         saveDraftAndOpen(app, draftKey, data.content, data.name || file.name || 'Untitled');
       } catch (error) {
         setStatus(error.message || 'Could not open this copy.');
