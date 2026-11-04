@@ -167,46 +167,38 @@
       }
     }
 
-    function launchCopy(file, button) {
-      button.disabled = true;
-      const app = file.kind === 'sheet' ? 'tabula.html' : file.kind === 'doc' ? 'docs.html' : '';
-      const draftKey = file.kind === 'sheet' ? 'tabula.draft' : 'scribae.doc.draft';
-      if (!app) { button.disabled = false; return; }
-      let data;
-      try {
-        data = JSON.parse(previewContent.textContent);
-      } catch (_) {
-        setStatus('Preview this file first, then open it in its app.');
-        button.disabled = false;
-        return;
-      }
-      if (!data || typeof data.content !== 'string') {
-        setStatus('Could not read the file content. Preview it again and retry.');
-        button.disabled = false;
-        return;
-      }
-      const win = window.open('about:blank', '_blank');
+    function saveDraftAndOpen(app, draftKey, content, title) {
+      const previous = localStorage.getItem(draftKey);
+      localStorage.setItem(draftKey, content);
+      const win = window.open(new URL(app, location.href).href, '_blank');
       if (!win) {
-        setStatus('The browser blocked the new tab. Allow pop-ups for this site and try again.');
-        button.disabled = false;
-        return;
+        if (previous === null) localStorage.removeItem(draftKey);
+        else localStorage.setItem(draftKey, previous);
+        throw new Error('The browser blocked the new tab. Allow pop-ups for this site and try again.');
       }
-      let previous;
+      setTimeout(() => {
+        try {
+          if (previous === null) localStorage.removeItem(draftKey);
+          else localStorage.setItem(draftKey, previous);
+        } catch (_) {}
+      }, 1500);
+      setStatus(`Opened a local copy of “${title}” in ${app.endsWith('tabula.html') ? 'Sheets' : 'Docs'}. The API-stored file was not changed.`);
+    }
+
+    async function launchCopy(file, button) {
+      button.disabled = true;
+      const kind = file.kind;
+      const app = kind === 'sheet' ? 'tabula.html' : kind === 'doc' ? 'docs.html' : '';
+      const draftKey = kind === 'sheet' ? 'tabula.draft' : 'scribae.doc.draft';
+      if (!app) { button.disabled = false; return; }
       try {
-        previous = localStorage.getItem(draftKey);
-        localStorage.setItem(draftKey, data.content);
-        win.location.href = new URL(app, location.href).href;
-        // The app loads this as a local working copy. Restore the prior local draft after its startup read.
-        setTimeout(() => {
-          try {
-            if (previous === null) localStorage.removeItem(draftKey);
-            else localStorage.setItem(draftKey, previous);
-          } catch (_) {}
-        }, 1500);
-        setStatus(`Opened a local copy of “${data.name || file.name || 'Untitled'}” in ${file.kind === 'sheet' ? 'Sheets' : 'Docs'}. The API-stored file was not changed.`);
+        const data = await api('/files/' + encodeURIComponent(file.id));
+        if (typeof data.content !== 'string') {
+          throw new Error('The API did not return file content in a usable format.');
+        }
+        saveDraftAndOpen(app, draftKey, data.content, data.name || file.name || 'Untitled');
       } catch (error) {
-        try { win.close(); } catch (_) {}
-        setStatus('Could not open this copy. Make sure this page and the app are served from the same site.');
+        setStatus(error.message || 'Could not open this copy.');
       } finally {
         button.disabled = false;
       }
