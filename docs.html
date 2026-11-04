@@ -68,14 +68,14 @@ const H=()=>pg.innerHTML.replace(/ class="(tsel)?"/g,'');
 const docStr=()=>{const h=H();return JSON.stringify({format:'scribae-doc',version:1,name:nameOf(),html:h,check:fh(h)})};
 const stat=()=>{const t=pg.innerText.trim();$('wc').textContent=(t?t.split(/\s+/).length:0)+' words'};
 const persist=()=>{dirty=1;clearTimeout(pt);pt=setTimeout(()=>{try{localStorage.setItem('scribae.doc.draft',docStr())}catch(e){}},700)};
-const setHtml=(h,n)=>{pg.innerHTML=Scribae.clean(h)||'<p><br></p>';$('dn').value=n||'Untitled document';stat();persist();dirty=0};
+const setHtml=(h,n)=>{Scribae.unlink();pg.innerHTML=Scribae.clean(h)||'<p><br></p>';$('dn').value=n||'Untitled document';stat();persist();dirty=0};
 function loadDoc(t,name){const o=JSON.parse(t);if(!o||o.format!=='scribae-doc'||typeof o.html!=='string')throw new Error('not a Scribae doc');setHtml(o.html,o.name||name);if(o.check!==undefined&&o.check!==fh(o.html))say('Opened – checksum mismatch: the file may have been edited or damaged')}
 const lib=u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('could not load the .docx converter (offline?)'));document.head.append(s)});
 async function openFile(f){try{const n=f.name,b=n.replace(/\.[^.]+$/,''),buf=await f.arrayBuffer(),u=new Uint8Array(buf,0,2);
 if(u[0]===208&&u[1]===207)throw new Error('old binary .doc files are not supported – save as .docx first');
 if(/\.docx$/i.test(n)||(u[0]===80&&u[1]===75)){await lib('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');setHtml((await mammoth.convertToHtml({arrayBuffer:buf})).value,b)}
 else{const t=new TextDecoder().decode(buf);if(/\.json$/i.test(n))loadDoc(t,b);else if(/\.(html?|doc)$/i.test(n)||/^\s*</.test(t))setHtml(t,b);else setHtml(t.split(/\r?\n/).map(l=>'<p>'+(esc(l)||'<br>')+'</p>').join(''),b)}
-say('Opened '+n)}catch(e){say('Could not open '+f.name+': '+e.message)}}
+say('Opened '+n);return true}catch(e){say('Could not open '+f.name+': '+e.message);return false}}
 const dl=(n,d,t)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([d],{type:t}));a.download=n;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4e3)};
 const save=()=>{dl(safe()+'.scribae-doc.json',docStr(),'application/json');dirty=0;say('Saved '+safe()+'.scribae-doc.json')};
 function exp(k){$('ex').value='';const h=H(),t=esc(nameOf());
@@ -179,6 +179,6 @@ addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>{e
 addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
 try{loadDoc(localStorage.getItem('scribae.doc.draft'))}catch(e){pg.innerHTML='<p><br></p>';stat()}
 dirty=0;
-Scribae.mount({kind:'doc',el:$('sb'),getName:nameOf,getContent:docStr,setContent:(s,n)=>loadDoc(s,n)});
+Scribae.mount({kind:'doc',el:$('sb'),say,exportAs:exp,importFile:openFile,getName:nameOf,getContent:docStr,setContent:(s,n)=>loadDoc(s,n)});
 </script>
 </body></html>
