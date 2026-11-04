@@ -18,6 +18,14 @@ const clean=h=>{const d=new DOMParser().parseFromString(h,'text/html');d.querySe
 /* Drive: your server account when signed in, otherwise this browser */
 const LD={get:()=>{try{return JSON.parse(LS.getItem('scribae.drive')||'{}')}catch(e){return{}}},set:o=>LS.setItem('scribae.drive',JSON.stringify(o))};
 const cloud=()=>srv&&me;
+/* which app a file belongs to, judged by its name */
+const kindOf=n=>/\.tabula(\.json)?$/i.test(n)||/\.(csv|tsv|xlsx|xlsm|xlsb|xls|ods|fods)$/i.test(n)?'sheet':/\.scribae-doc(\.json)?$/i.test(n)||/\.(docx|doc|html?|md|txt)$/i.test(n)?'doc':null;
+/* the Drive file the open document is linked to: "Save changes" updates it, "Save as new file" makes another */
+const link=id=>{if(!H||!H.kind)return;H.id=id||null;try{id?LS.setItem('scribae.link.'+H.kind,id):LS.removeItem('scribae.link.'+H.kind)}catch(e){}};
+/* files handed from the launcher to the right app for import (kept in IndexedDB so large files survive the page change) */
+const idb=()=>new Promise((ok,no)=>{const r=indexedDB.open('scribae-handoff',1);r.onupgradeneeded=()=>r.result.createObjectStore('q',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const tx=async(mode,f)=>{const d=await idb();return new Promise((ok,no)=>{const t=d.transaction('q',mode);let r;try{r=f(t.objectStore('q'))}catch(e){return no(e)}t.oncomplete=()=>ok(r&&r.result);t.onerror=()=>no(t.error);t.onabort=()=>no(t.error)})};
+const hand={put:fs=>tx('readwrite',s=>{fs.forEach((f,i)=>s.put({id:Math.random().toString(36).slice(2)+Date.now().toString(36),at:Date.now()+i,file:f,kind:kindOf(f.name)}))}),list:()=>tx('readonly',s=>s.getAll()).then(r=>(r||[]).sort((a,b)=>a.at-b.at)),del:id=>tx('readwrite',s=>s.delete(id)),clear:()=>tx('readwrite',s=>s.clear())};
 const drive={
 async list(kind){if(cloud())return(await api('/files')).files.filter(f=>!kind||f.kind===kind);return Object.values(LD.get()).filter(f=>!kind||f.kind===kind).map(f=>({id:f.id,name:f.name,kind:f.kind,updated:f.updated,size:f.content.length})).sort((a,b)=>b.updated-a.updated)},
 async get(id){if(cloud())return api('/files/'+id);const f=LD.get()[id];if(!f)throw new Error('No such file');return f},
@@ -47,16 +55,29 @@ else if(a==='rv'){if(confirm('Revoke this key?')){await api('/keys/'+i,{m:'DELET
 else if(a==='show'){const r=await api('/inbox');q('#kv',d).innerHTML=r.keys.map(k=>'<p>Delivered key, expires '+new Date(k.exp).toLocaleDateString()+':</p><code>'+esc(k.key)+'</code><button data-a="done" data-i="'+k.id+'">I’ve saved it – remove from inbox</button>').join('')||'<p class="mu">Nothing waiting.</p>'}
 else if(a==='done'){await api('/inbox/'+i,{m:'DELETE'});q('#kv',d).innerHTML='';await paint()}
 }catch(x){msg(d,x.message)}};paint()}
-async function drv(){if(!H)return;const d=dlg('<h3>Drive'+(cloud()?'':' (this browser)')+'</h3><p><button class="pr" data-a="save">Save “'+esc(H.getName())+'” to Drive</button></p><div id="sl" class="mu">Loading…</div>');
-const paint=async()=>{try{const L=await drive.list(H.kind);q('#sl',d).innerHTML=L.length?L.map(f=>'<div class="row"><span>'+esc(f.name)+' <small class="mu">'+new Date(f.updated).toLocaleString()+'</small></span><button data-a="open" data-i="'+esc(f.id)+'">Open</button><button data-a="del" data-i="'+esc(f.id)+'">Delete</button></div>').join(''):'Nothing saved yet.'}catch(x){msg(d,x.message)}};
-d.onclick=async e=>{const a=e.target.dataset.a,i=e.target.dataset.i;if(!a)return;try{if(a==='save'){const r=await drive.save({id:H.id,name:H.getName(),kind:H.kind,content:H.getContent()});H.id=r.id;await paint();msg(d,'Saved to Drive')}else if(a==='open'){const f=await drive.get(i);await H.setContent(f.content,f.name);H.id=f.id;d.close()}else if(a==='del'&&confirm('Delete this file from Drive?')){await drive.del(i);if(H.id===i)H.id=null;await paint()}}catch(x){msg(d,x.message)}};paint()}
+async function drv(){if(!H||!H.kind)return;const nm=esc(H.getName());
+const d=dlg('<h3>Drive'+(cloud()?'':' (this browser)')+'</h3><p>'+(H.id?'<button class="pr" data-a="save">Save changes</button> <button data-a="new">Save as new file</button>':'<button class="pr" data-a="new">Save “'+nm+'” to Drive</button>')+' <a href="index.html">All files</a></p><div id="sl" class="mu">Loading…</div>');
+const paint=async()=>{try{const L=await drive.list(H.kind);q('#sl',d).innerHTML=L.length?L.map(f=>'<div class="row"><span>'+esc(f.name)+(f.id===H.id?' <small class="mu">(open)</small>':'')+' <small class="mu">'+new Date(f.updated).toLocaleString()+'</small></span><button data-a="open" data-i="'+esc(f.id)+'">Open</button><button data-a="del" data-i="'+esc(f.id)+'">Delete</button></div>').join(''):'Nothing saved yet.'}catch(x){msg(d,x.message)}};
+d.onclick=async e=>{const a=e.target.dataset.a,i=e.target.dataset.i;if(!a)return;try{
+if(a==='save'||a==='new'){const r=await drive.save({id:a==='save'?H.id:undefined,name:H.getName(),kind:H.kind,content:H.getContent()});link(r.id);await paint();msg(d,'Saved to Drive')}
+else if(a==='open'){const f=await drive.get(i);if(await H.setContent(f.content,f.name)===false)throw new Error('Could not open that file');link(f.id);d.close()}
+else if(a==='del'&&confirm('Delete this file from Drive?')){await drive.del(i);if(H.id===i)link(null);await paint()}
+}catch(x){msg(d,x.message)}};paint()}
+/* what an app does when it is opened from the launcher: ?open=ID[&export=FORMAT] or ?import=1 */
+async function boot(h){const say=m=>{try{h.say&&h.say(m)}catch(e){}},P=new URLSearchParams(location.search),open=P.get('open'),fmt=P.get('export'),imp=P.get('import'),keep=()=>{if(location.search)history.replaceState(null,'',location.pathname)};
+await ready;
+if(open){keep();try{const f=await drive.get(open);if(await h.setContent(f.content,f.name)===false)throw new Error('the file could not be read');link(f.id);if(fmt&&h.exportAs)setTimeout(()=>h.exportAs(fmt),400)}catch(x){say('Could not open that file: '+x.message)}return}
+if(imp){keep();try{const items=(await hand.list()).filter(i=>i.kind===h.kind);let n=0,bad=0;
+for(const it of items){const okk=h.importFile?await h.importFile(it.file):false;await hand.del(it.id);if(!okk){bad++;continue}try{const r=await drive.save({name:h.getName(),kind:h.kind,content:h.getContent()});link(r.id);n++}catch(x){bad++;say('Opened, but could not save to Drive: '+x.message)}}
+const rest=await hand.list();say((n?'Imported '+n+' file'+(n>1?'s':'')+' into your Drive. ':'Nothing was imported. ')+(bad?bad+' could not be imported. ':'')+(rest.length?rest.length+' more waiting - go back to the launcher to finish.':''))}catch(x){say('Import failed: '+x.message)}return}
+const L=LS.getItem('scribae.link.'+h.kind);if(L)h.id=L}
 function mount(h){H=h;h.id=null;h.el.innerHTML='<button data-a="drive">Drive</button><button data-a="acct">Account</button><input type="color" data-a="ac" value="#28564b" title="Accent colour" style="width:30px;height:26px;padding:0;border:0;background:none;cursor:pointer"><select data-a="th" title="Theme"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select>';
 const c=q('[data-a=ac]',h.el),t=q('[data-a=th]',h.el);if(h.min){c.remove();t.remove();q('[data-a=drive]',h.el).remove()}h.el.onclick=e=>{const a=e.target.dataset.a;if(a==='drive')drv();else if(a==='acct')acct()};
-c.oninput=()=>accent(c.value,0);c.onchange=()=>accent(c.value,1);t.onchange=()=>mode(t.value,1);label()}
+c.oninput=()=>accent(c.value,0);c.onchange=()=>accent(c.value,1);t.onchange=()=>mode(t.value,1);label();if(h.kind)boot(h)}
 /* start-up: detect the server, restore the session */
 const ready=(async()=>{try{info=await api('/ping');srv=true;if(tok){try{me=await api('/me');const pr=me.prefs||{};if(pr.ac)accent(pr.ac);if(pr.theme)mode(pr.theme)}catch(e){setTok('')}}}catch(e){srv=false}label();emit('ready',{server:srv,me});return srv})();
 /* embedding: a host page (listed in config.js embedOrigins) can send {scribae:'open',content,name} or {scribae:'get'} */
 addEventListener('message',async e=>{const m=e.data;if(!H||!H.setContent||!m||!m.scribae||!(cfg.embedOrigins||[]).includes(e.origin))return;if(m.scribae==='open'){await H.setContent(m.content,m.name||'Untitled');H.id=null}else if(m.scribae==='get')e.source.postMessage({scribae:'doc',kind:H.kind,name:H.getName(),content:H.getContent()},e.origin)});
 if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
-window.Scribae={cfg,api,drive,on,emit,mount,accent,mode,clean,ready,derive,login:(u,p)=>auth('login',u,p),logout,get me(){return me},get info(){return info},get online(){return srv}};
+window.Scribae={cfg,api,drive,on,emit,mount,accent,mode,clean,ready,derive,unlink:()=>link(null),kindOf,handoff:hand,localFiles:()=>Object.values(LD.get()),dropLocal:id=>{const d=LD.get();delete d[id];LD.set(d)},login:(u,p)=>auth('login',u,p),logout,get me(){return me},get info(){return info},get online(){return srv}};
 })();
