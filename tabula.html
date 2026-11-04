@@ -166,7 +166,7 @@ if(/\.(tabula|json)$/i.test(n))doc=fromTab(JSON.parse(dec(buf)));
 else if(zip||xml||/\.(xlsx|xlsm|xlsb|xls|ods)$/i.test(n)){if(typeof XLSX==='undefined')throw new Error('the Excel/ODS engine failed to load');const wb=XLSX.read(xml?dec(buf):buf,{type:xml?'string':'array',cellDates:true});doc={name:base,act:0,sheets:wb.SheetNames.map(k=>fromWs(k,wb.Sheets[k]))}}
 else doc={name:base,act:0,sheets:[mkS('Sheet1',csv(dec(buf),/\.tsv$/i.test(n)?'\t':0).map(r=>r.map(v=>parse(v,1))))]};
 const bad=doc.bad;delete doc.bad;if(!doc.sheets.length)doc.sheets.push(mkS('Sheet1'));
-mut(()=>{S=doc;sel={r:0,c:0,r2:0,c2:0}});dirty=0;$('dn').value=S.name;sc.scrollTop=sc.scrollLeft=0;paint();say(bad?'Opened '+n+' – checksum mismatch: the file may have been edited or damaged':'Opened '+n)}catch(e){say('Could not open '+f.name+': '+(e.message||e))}}
+Scribae.unlink();mut(()=>{S=doc;sel={r:0,c:0,r2:0,c2:0}});dirty=0;$('dn').value=S.name;sc.scrollTop=sc.scrollLeft=0;paint();say(bad?'Opened '+n+' – checksum mismatch: the file may have been edited or damaged':'Opened '+n);return true}catch(e){say('Could not open '+f.name+': '+(e.message||e));return false}}
 /* ---------- state ---------- */
 let S,sel,UD=[],RD=[],ed=0,dirty=0,clip,drag=0,rz=null,tick=0,pt;
 const blank=()=>({name:'Untitled spreadsheet',act:0,sheets:[mkS('Sheet1')]});
@@ -261,7 +261,7 @@ sc.onscroll=()=>{if(!tick){tick=1;requestAnimationFrame(()=>{tick=0;paint()})}};
 addEventListener('resize',paint);
 $('tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;const i=b.dataset.i;endEdit(1);if(i==='add')addSheet();else if(i==='del')delSheet();else if(+i!==S.act){S.act=+i;sel={r:0,c:0,r2:0,c2:0};sc.scrollTop=sc.scrollLeft=0;full()}};
 $('tabs').ondblclick=e=>{const b=e.target.closest('.tab');if(!b)return;const i=+b.dataset.i,inp=document.createElement('input');inp.value=S.sheets[i].n;inp.size=14;b.replaceWith(inp);inp.focus();inp.select();let fin=0;const done=ok=>{if(fin)return;fin=1;ok&&inp.value.trim()?mut(()=>{S.sheets[i].n=uniq(inp.value.trim(),i)}):full()};inp.onblur=()=>done(1);inp.onkeydown=ev=>{if(ev.key==='Enter')done(1);else if(ev.key==='Escape')done(0)}};
-$('nw').onclick=()=>{endEdit(1);mut(()=>{S=blank();sel={r:0,c:0,r2:0,c2:0}});dirty=0;$('dn').value=S.name};
+$('nw').onclick=()=>{endEdit(1);Scribae.unlink();mut(()=>{S=blank();sel={r:0,c:0,r2:0,c2:0}});dirty=0;$('dn').value=S.name};
 $('op').onclick=()=>$('fi').click();
 $('fi').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openFile(f)};
 $('sv').onclick=saveNative;$('ex').onchange=e=>exportAs(e.target.value);
@@ -277,7 +277,7 @@ addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='
 try{const t=localStorage.getItem('tabula.draft');if(t){S=fromTab(JSON.parse(t));delete S.bad}}catch(e){S=0}
 if(S)say('Restored your last session');else S=blank();
 $('dn').value=S.name;sel={r:0,c:0,r2:0,c2:0};full();sc.focus();setTimeout(paint,60);
-Scribae.mount({kind:'sheet',el:$('sb'),getName:baseName,getContent:tabStr,setContent:(t,n)=>openFile(new File([t],n+'.tabula.json'))});
+Scribae.mount({kind:'sheet',el:$('sb'),say,exportAs,importFile:openFile,getName:baseName,getContent:tabStr,setContent:(t,n)=>openFile(new File([t],n+'.tabula.json'))});
 </script>
 </body>
 </html>
