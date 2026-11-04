@@ -31,6 +31,13 @@ Run these in a terminal inside the `cloudflare/` folder. You need Node.js on you
 - **Key delivery:** the admin can deliver every active user a fresh read/write key now or every N days. It waits, encrypted, in the user's inbox until they view and dismiss it; the admin never sees key values.
 - Launcher: `index.html` is the start page. Its Admin link only appears for signed-in admins.
 
+## Drive and the launcher
+- `index.html` lists **every** file in your Drive (docs and sheets together) with filter, search, Export, Delete and Import. Clicking a file opens it in the right app.
+- Where files live: in your account when you are signed in, otherwise in this browser. After signing in, the launcher offers to move browser-only files into your account.
+- Inside Docs or Sheets, Drive → "Save changes" updates the open file; "Save as new file" makes another one. Starting a New document or opening a file from your computer unlinks it, so it can never overwrite an earlier Drive file by accident.
+- Export: "Original file" downloads the native file straight away; other formats (Excel, ODS, CSV, Word, text...) open the file in the matching app, which converts it.
+- Import: native `.tabula.json` / `.scribae-doc.json` files go straight into Drive. Spreadsheets (`.csv .tsv .xlsx .xls .ods`) and documents (`.docx .html .md .txt`) are opened by the right app, which saves them to Drive. Mixed selections finish from the banner on the launcher.
+
 ## Integrating another app
 - Embed `tabula.html` / `docs.html` in an iframe and list your site in `embedOrigins` (config.js). Send `{scribae:'open',content,name}` or `{scribae:'get'}`; replies are `{scribae:'doc',kind,name,content}`.
 - REST API (Bearer session token or API key): `/api/me`, `/api/files` (GET/POST), `/api/files/:id` (GET/DELETE), `/api/credits/spend` (POST). Files are `{id,name,kind:'sheet'|'doc',content}` where content is the native JSON.
