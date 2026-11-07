@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142b28">
+  <title>Tabula API Drive Viewer</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg">
+  <style>
+    :root { --forest:#193a34; --gold:#c49a55; --cream:#f5f0e5; --paper:#fffdf7; --ink:#23342f; --muted:#66736b; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--ink);
+      background: radial-gradient(ellipse at 15% 15%, rgba(196,154,85,.13), transparent 30%), radial-gradient(ellipse at 90% 80%, rgba(40,86,75,.12), transparent 32%), var(--cream);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    header { padding: 20px 7vw; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(25,58,52,.14); }
+    .brand { display: flex; align-items: center; gap: 12px; color: var(--forest); font-weight: bold; letter-spacing: .04em; text-decoration: none; }
+    .brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; color: var(--gold); font-size: 19px; }
+    .back { color: #89672f; font: 600 .78rem Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; }
+    .back:hover { text-decoration: underline; }
+    main { width: min(860px, 90vw); margin: 0 auto; padding: 44px 0 70px; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .22em; color: #8b6a36; font: 600 .76rem/1.5 Arial, sans-serif; }
+    h1 { margin: 10px 0 10px; color: var(--forest); font-size: clamp(2rem, 5vw, 3.2rem); font-weight: normal; line-height: 1.08; }
+    .intro { max-width: 620px; margin: 0 0 18px; color: var(--muted); line-height: 1.7; }
+    .notice { margin: 0 0 18px; padding: 12px 14px; border: 1px solid rgba(196,154,85,.6); border-radius: 7px; background: rgba(196,154,85,.12); font: .86rem/1.55 Arial, sans-serif; }
+    .card { background: rgba(255,253,247,.88); border: 1px solid rgba(25,58,52,.16); border-radius: 7px; box-shadow: 0 10px 30px rgba(31,49,40,.055); padding: 18px; margin-bottom: 18px; }
+    form { display: grid; grid-template-columns: max-content minmax(10rem, 1fr) max-content; align-items: center; gap: 10px; }
+    label { font: .88rem Arial, sans-serif; color: var(--muted); }
+    input[type=text], input[type=password], select { min-width: 0; font: inherit; font-size: .95rem; padding: 8px 12px; border: 1px solid rgba(25,58,52,.2); border-radius: 6px; background: #fff; color: var(--ink); }
+    .wide { grid-column: 2 / -1; }
+    .pill { font: 600 .78rem Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #89672f; background: none; border: 1px solid rgba(196,154,85,.55); border-radius: 20px; padding: 7px 14px; cursor: pointer; }
+    .pill:hover { background: rgba(196,154,85,.16); }
+    .pill.main { background: var(--forest); border-color: var(--forest); color: #fff; }
+    .pill:disabled { opacity: .5; cursor: default; }
+    .saved-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(25,58,52,.1); }
+    #status { margin: 0 0 16px; color: var(--muted); font: .88rem/1.5 Arial, sans-serif; min-height: 1.3em; }
+    [hidden] { display: none !important; }
+    @media (max-width: 600px) { form { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
+  </style>
+  <script src="config.js"></script>
+  <script src="scribae.js"></script>
+  <script src="drive-ui.js"></script>
+</head>
+<body>
+  <header>
+    <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">✦</span> THE SCRIPTORIUM</a>
+    <a class="back" href="index.html" title="Return to the main page">← Main page</a>
+  </header>
+  <main>
+    <div class="eyebrow">Connect with an API key</div>
+    <h1>Drive viewer</h1>
+    <p class="intro">Browse an account’s Drive with a key that has <b>read</b> permission: folders, previews and downloads. A key with <b>write</b> permission can also upload, create folders, rename, move and delete.</p>
+    <p class="notice"><strong>Key storage:</strong> remembered keys are stored in this browser’s local storage without encryption. Only remember a key on a device you trust. The server does not reveal a key’s name here, so you can give each saved key your own label.</p>
+
+    <div class="card">
+      <form id="connect-form">
+        <label for="api-key">API key</label>
+        <input id="api-key" type="password" autocomplete="off" spellcheck="false" required placeholder="scr_…">
+        <button class="pill main" type="submit">Connect</button>
+        <label for="key-label">Label for this key</label>
+        <input id="key-label" class="wide" type="text" maxlength="60" placeholder="e.g. Personal read-only key">
+        <span></span>
+        <label class="wide"><input id="remember-key" type="checkbox"> Remember this key in this browser after a successful connection</label>
+      </form>
+      <div class="saved-row">
+        <label for="saved-keys">Saved keys</label>
+        <select id="saved-keys"><option value="">None saved</option></select>
+        <button class="pill" id="load-key" type="button">Use selected</button>
+        <button class="pill" id="forget-key" type="button">Forget selected</button>
+        <button class="pill" id="clear-button" type="button">Disconnect</button>
+      </div>
+    </div>
+
+    <p id="status" role="status" aria-live="polite">The current key is kept only in memory unless you choose to remember it.</p>
+    <section id="drive" hidden></section>
+  </main>
+
+  <script>
+    'use strict';
+    const $ = s => document.querySelector(s);
+    const form = $('#connect-form'), keyField = $('#api-key'), labelField = $('#key-label'), rememberField = $('#remember-key'), savedSelect = $('#saved-keys'), driveEl = $('#drive');
+    const SAVED_KEYS = 'tabula.apiDrive.savedKeys';
+    const cur = { d: null };
+    let ui = null;
+    const setStatus = m => { $('#status').textContent = m; };
+
+    /* ---- remembered keys (kept from the first version) ---- */
+    function readSavedKeys() {
+      try {
+        const v = JSON.parse(localStorage.getItem(SAVED_KEYS) || '[]');
+        return Array.isArray(v) ? v.filter(x => x && typeof x.id === 'string' && typeof x.name === 'string' && typeof x.key === 'string') : [];
+      } catch (_) { return []; }
+    }
+    function renderSavedKeys(selectedId = '') {
+      const saved = readSavedKeys(); savedSelect.replaceChildren();
+      if (!saved.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'None saved'; savedSelect.append(o); return; }
+      for (const item of saved) { const o = document.createElement('option'); o.value = item.id; o.textContent = item.name; o.selected = item.id === selectedId; savedSelect.append(o); }
+    }
+    function rememberKey(name, key) {
+      const saved = readSavedKeys(), id = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+      saved.push({ id, name: name.trim() || 'Saved API key', key });
+      localStorage.setItem(SAVED_KEYS, JSON.stringify(saved)); renderSavedKeys(id);
+    }
+
+    /* ---- converting a file for download ---- */
+    const safeFilename = n => String(n || 'tabula-file').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim() || 'tabula-file';
+    function saveBlob(blob, name) {
+      const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name;
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function csvFromSheet(content) {
+      const p = JSON.parse(content);
+      if (!p || p.format !== 'tabula' || !Array.isArray(p.sheets) || !p.sheets.length) throw new Error('This is not a recognised Tabula spreadsheet. Download the original file instead.');
+      const sh = p.sheets[Math.max(0, Math.min(Number.isInteger(p.active) ? p.active : 0, p.sheets.length - 1))];
+      const csv = (Array.isArray(sh.cells) ? sh.cells : []).map(row => (Array.isArray(row) ? row : []).map(v => {
+        const t = v == null ? '' : String(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+      }).join(',')).join('\r\n');
+      return '\uFEFF' + csv;
+    }
+    const escapeHtml = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    function documentHtml(content, name) {
+      let html = content, title = name || 'Document';
+      try { const d = JSON.parse(content); if (d && d.format === 'scribae-doc' && typeof d.html === 'string') { html = d.html; title = d.name || title; } } catch (_) {}
+      if (/^\s*<!doctype|^\s*<html\b/i.test(html)) return html;
+      return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + escapeHtml(title) + '</title></head><body>' + html + '</body></html>';
+    }
+    const textFromDocument = (content, name) => { const d = new DOMParser().parseFromString(documentHtml(content, name), 'text/html'); return d.body.innerText || d.body.textContent || ''; };
+
+    /* ---- open a private copy in Sheets / Docs (the Drive file itself is never changed) ---- */
+    async function launchCopy(i) {
+      const sheet = i.kind === 'sheet', app = sheet ? 'tabula.html' : 'docs.html', draftKey = sheet ? 'tabula.draft' : 'scribae.doc.draft', linkKey = 'scribae.link.' + (sheet ? 'sheet' : 'doc');
+      const f = await cur.d.get(i.id);
+      if (typeof f.content !== 'string') throw new Error('The API did not return the file content in a usable form.');
+      const previous = localStorage.getItem(draftKey), previousLink = localStorage.getItem(linkKey);
+      localStorage.setItem(draftKey, f.content);
+      localStorage.removeItem(linkKey);              /* the copy must not be linked to any Drive file */
+      const restore = () => { try { previous === null ? localStorage.removeItem(draftKey) : localStorage.setItem(draftKey, previous); if (previousLink !== null) localStorage.setItem(linkKey, previousLink); } catch (_) {} };
+      const win = window.open(new URL(app, location.href).href, '_blank');
+      if (!win) { restore(); throw new Error('The browser blocked the new tab. Allow pop-ups for this site and try again.'); }
+      setTimeout(restore, 1500);
+      setStatus('Opened a local copy of “' + i.name + '” in ' + (sheet ? 'Sheets' : 'Docs') + '. The file in the Drive was not changed.');
+    }
+    async function doExport(i, k) {
+      if (k === 'copy') return launchCopy(i);
+      const f = await cur.d.get(i.id), base = safeFilename(i.name);
+      if (k === 'csv' && i.kind === 'sheet') saveBlob(new Blob([csvFromSheet(f.content)], { type: 'text/csv;charset=utf-8' }), base + '.csv');
+      else if (k === 'html' && i.kind === 'doc') saveBlob(new Blob([documentHtml(f.content, i.name)], { type: 'text/html;charset=utf-8' }), base + '.html');
+      else if (k === 'txt' && i.kind === 'doc') saveBlob(new Blob([textFromDocument(f.content, i.name)], { type: 'text/plain;charset=utf-8' }), base + '.txt');
+    }
+
+    /* ---- connect ---- */
+    async function connect(key) {
+      const d = Scribae.cloudDrive(key), me = await d.me();
+      const scopes = Array.isArray(me.scopes) ? me.scopes : [];
+      if (!scopes.includes('read')) throw new Error('This key does not have read permission, so it cannot list files.');
+      const write = scopes.includes('write'), title = me.name + '’s Drive';
+      cur.d = d; driveEl.hidden = false;
+      if (!ui) {
+        ui = DriveUI.mount(driveEl, {
+          drive: d, write, title, rootLabel: title,
+          exportFormats: i => [['native', 'Original file (' + (i.kind === 'sheet' ? '.tabula.json' : '.scribae-doc.json') + ')']].concat(
+            i.kind === 'sheet' ? [['csv', 'CSV (.csv)'], ['copy', 'Open a copy in Sheets']] : [['html', 'Web page (.html)'], ['txt', 'Plain text (.txt)'], ['copy', 'Open a copy in Docs']]),
+          doExport,
+          onOpen: i => ui.preview(i),
+          previewActions: i => i.kind === 'sheet' || i.kind === 'doc' ? [{ label: 'Open a copy in ' + (i.kind === 'sheet' ? 'Sheets' : 'Docs'), run: x => launchCopy(x).catch(e => setStatus(e.message)) }] : []
+        });
+      } else { ui.setDrive(d); ui.setWrite(write); ui.setTitle(title); ui.setRoot(title); }
+      location.hash = '#/';
+      await ui.load();
+      ui.note('Connected with a ' + (write ? 'read and write' : 'read-only') + ' key.');
+      return { me, write, count: ui.items().length };
+    }
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const candidate = keyField.value.trim(); if (!candidate) return;
+      const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; setStatus('Connecting…');
+      try {
+        const r = await connect(candidate);
+        let msg = 'Connected to ' + r.me.name + '’s Drive: ' + r.count + ' item' + (r.count === 1 ? '' : 's') + '.';
+        if (rememberField.checked) { try { rememberKey(labelField.value, candidate); msg += ' This key was remembered in this browser.'; } catch (_) { msg += ' The browser could not store the key.'; } }
+        setStatus(msg);
+      } catch (err) { cur.d = null; driveEl.hidden = true; setStatus(err.message); }
+      finally { submit.disabled = false; }
+    });
+    $('#load-key').addEventListener('click', () => {
+      const saved = readSavedKeys().find(x => x.id === savedSelect.value);
+      if (!saved) return setStatus('Choose a saved key first.');
+      keyField.value = saved.key; labelField.value = saved.name; rememberField.checked = false; setStatus('Loaded “' + saved.name + '”. Connect to use it.');
+    });
+    $('#forget-key').addEventListener('click', () => {
+      const id = savedSelect.value; if (!id) return setStatus('Choose a saved key to forget.');
+      const saved = readSavedKeys(), gone = saved.find(x => x.id === id);
+      localStorage.setItem(SAVED_KEYS, JSON.stringify(saved.filter(x => x.id !== id))); renderSavedKeys();
+      setStatus('Forgot “' + (gone ? gone.name : 'saved key') + '” in this browser. This does not revoke the key on the server.');
+    });
+    $('#clear-button').addEventListener('click', () => {
+      cur.d = null; keyField.value = ''; driveEl.hidden = true;
+      setStatus('Disconnected. The key was cleared from this page. Remembered keys are unchanged.');
+    });
+    renderSavedKeys();
+  </script>
+</body>
+</html>
